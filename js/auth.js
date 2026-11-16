@@ -164,7 +164,50 @@ async function handleFirebaseAuthStateChanged(user) {
 
 // 1. Continue with Google (Pops out Google Account Chooser!)
 async function handleGoogleSignInBtnClick() {
+    // If running inside Android APK with Native Auth Bridge, pop up the device's native account chooser!
+    if (typeof window !== 'undefined' && window.AndroidNativeAuth && typeof window.AndroidNativeAuth.promptGoogleAccountPicker === 'function') {
+        if (typeof showToast === 'function') {
+            showToast('Choose your Google account...', '⏳');
+        }
+        try {
+            window.AndroidNativeAuth.promptGoogleAccountPicker();
+            return;
+        } catch (e) {
+            console.warn('[Auth] Native account picker failed, falling back to Firebase:', e);
+        }
+    }
     await signInWithGoogleFirebase();
+}
+
+/**
+ * Native Android Google Account Chooser Callback
+ * Called by Android MainActivity when the user picks their Google account on their device.
+ */
+function onNativeGoogleAccountSelected(email) {
+    if (!email) return;
+    console.log('[Auth] Native Google account chosen:', email);
+    let name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Yakthung Learner';
+    const profile = {
+        id: 'g_' + Math.abs(hashCode(email.toLowerCase())),
+        name: name,
+        username: name,
+        email: email,
+        picture: 'https://api.dicebear.com/7.x/bottts/svg?seed=' + encodeURIComponent(name),
+        provider: 'google',
+        isLocalAccount: true,
+        lastSynced: new Date().toISOString()
+    };
+    applySignedInUser(profile);
+    saveLocalAccountRecord(name, email, 'google_device_auth', profile.id);
+    if (typeof showToast === 'function') {
+        showToast(`Welcome, ${name}! Signed in with Google.`, '✅');
+    }
+    if (typeof syncCloudProgress === 'function') {
+        try { syncCloudProgress(false); } catch (e) {}
+    }
+}
+if (typeof window !== 'undefined') {
+    window.onNativeGoogleAccountSelected = onNativeGoogleAccountSelected;
 }
 
 async function signInWithGoogleFirebase() {
