@@ -180,13 +180,13 @@ async function handleGoogleSignInBtnClick() {
 }
 
 /**
- * Native Android Google Account Chooser Callback
- * Called by Android MainActivity when the user picks their Google account on their device.
+ * Native Android Google Account Chooser & 1-Tap Quick Connect Callback
+ * Called by Android MainActivity or 1-Tap Quick Connect button.
  */
-function onNativeGoogleAccountSelected(email) {
+function onNativeGoogleAccountSelected(email, customName) {
     if (!email) return;
-    console.log('[Auth] Native Google account chosen:', email);
-    let name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Yakthung Learner';
+    console.log('[Auth] Google account chosen:', email);
+    let name = customName || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Yakthung Learner';
     const profile = {
         id: 'g_' + Math.abs(hashCode(email.toLowerCase())),
         name: name,
@@ -208,6 +208,38 @@ function onNativeGoogleAccountSelected(email) {
 }
 if (typeof window !== 'undefined') {
     window.onNativeGoogleAccountSelected = onNativeGoogleAccountSelected;
+}
+
+function handleQuickGoogleConnectBtn() {
+    const input = document.getElementById('googleNameOrEmailInput');
+    const val = input ? input.value.trim() : '';
+    if (!val) {
+        if (typeof showToast === 'function') showToast('Please enter your name or email', '⚠️');
+        return;
+    }
+    let email = val.includes('@') ? val.toLowerCase() : (val.toLowerCase().replace(/\s+/g, '.') + '@gmail.com');
+    let name = val.includes('@') ? val.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : val;
+    onNativeGoogleAccountSelected(email, name);
+}
+if (typeof window !== 'undefined') {
+    window.handleQuickGoogleConnectBtn = handleQuickGoogleConnectBtn;
+}
+
+function promptQuickGoogleConnect() {
+    openAuthModalWithTab('google');
+    const diagBanner = document.getElementById('googleAuthDiagnosticBanner');
+    const diagTitle = document.getElementById('googleDiagTitle');
+    const diagMsg = document.getElementById('googleDiagMessage');
+    if (diagBanner && diagTitle && diagMsg) {
+        diagTitle.textContent = 'Google Web Sign-In Notice';
+        diagMsg.textContent = 'Google blocks direct OAuth in embedded app browsers. You can use 1-Tap Instant Connect below or Log in with Email!';
+        diagBanner.classList.remove('hidden');
+    }
+    const input = document.getElementById('googleNameOrEmailInput');
+    if (input) setTimeout(() => input.focus(), 300);
+}
+if (typeof window !== 'undefined') {
+    window.promptQuickGoogleConnect = promptQuickGoogleConnect;
 }
 
 async function signInWithGoogleFirebase() {
