@@ -1,0 +1,2657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Yakthung Pan • ᤕᤰᤌᤢᤱ ᤐᤠᤴ</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Embed Noto Sans Limbu + Noto Sans Devanagari + Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@500;700&family=Noto+Sans+Limbu&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        limbu: ['"Noto Sans Limbu"', 'sans-serif'],
+                        deva: ['"Noto Sans Devanagari"', 'sans-serif'],
+                    },
+                    colors: {
+                        terracotta: {
+                            50: '#fdf4f3',
+                            100: '#fbe6e4',
+                            500: '#c84b31',
+                            600: '#a83820',
+                            700: '#8a2b17',
+                        },
+                        parchment: {
+                            50: '#fdfaf5',
+                            100: '#f7f2e8',
+                            200: '#ece3d0',
+                            300: '#dfd0b3',
+                        },
+                        slatebrand: {
+                            800: '#1e252b',
+                            900: '#0f172a',
+                        },
+                        goldaccent: {
+                            400: '#f59e0b',
+                            500: '#d97706',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        #tracingCanvas {
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        .dhaka-header {
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(#059669 0.85px, transparent 0.85px), 
+                radial-gradient(#f59e0b 0.85px, #0f172a 0.85px);
+            background-size: 22px 22px;
+            background-position: 0 0, 11px 11px;
+        }
+
+        .node-3d {
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .node-3d:active {
+            transform: translateY(4px) scale(0.96);
+        }
+
+        @keyframes pulseRing {
+            0% { transform: scale(0.95); opacity: 0.85; }
+            70% { transform: scale(1.38); opacity: 0; }
+            100% { transform: scale(1.38); opacity: 0; }
+        }
+        .active-node-ring {
+            animation: pulseRing 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+        }
+
+        @keyframes floatPlay {
+            0%, 100% { transform: translate(-50%, 0px); }
+            50% { transform: translate(-50%, -6px); }
+        }
+        .float-play-badge {
+            animation: floatPlay 1.8s ease-in-out infinite;
+        }
+
+        @keyframes shakeNode {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            50% { transform: translateX(6px); }
+            75% { transform: translateX(-4px); }
+        }
+        .shake-locked {
+            animation: shakeNode 0.35s ease-in-out;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slatebrand-900 font-sans min-h-screen flex justify-center selection:bg-emerald-600 selection:text-white">
+
+    <!-- MOBILE-FIRST APP SHELL (max-w-[460px]) -->
+    <div class="w-full max-w-[460px] bg-parchment-50 min-h-screen flex flex-col shadow-2xl relative overflow-x-hidden border-x border-slate-800">
+
+        <!-- ========================================================= -->
+        <!-- TOP HUD BAR: BRANDING, STREAK, XP, MASTERED, CHART & ♥    -->
+        <!-- ========================================================= -->
+        <header class="dhaka-header text-white px-3.5 py-3 flex items-center justify-between gap-2 border-b border-emerald-700/40 sticky top-0 z-30 shrink-0 shadow-md">
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 border border-goldaccent-400/70 flex items-center justify-center shadow shrink-0">
+                    <span class="font-limbu text-xl text-white font-bold">ᤕ</span>
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <h1 class="text-sm font-extrabold tracking-tight text-white truncate">Yakthung Pan</h1>
+                    </div>
+                    <p class="font-limbu text-[11px] text-goldaccent-400 leading-none mt-0.5">ᤕᤰᤌᤢᤱ ᤐᤠᤴ</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+                <!-- Streak Pill -->
+                <div class="px-2 py-1 rounded-xl bg-white/10 border border-white/10 flex items-center gap-1 text-[11px] font-extrabold" title="Daily Streak">
+                    <span>🔥</span>
+                    <span id="hudStreak" class="text-amber-300">1</span>
+                </div>
+
+                <!-- XP Pill -->
+                <div class="px-2 py-1 rounded-xl bg-white/10 border border-white/10 flex items-center gap-1 text-[11px] font-extrabold" title="Total XP">
+                    <span>⚡</span>
+                    <span id="hudXp" class="text-emerald-300">0</span>
+                </div>
+
+                <!-- Mastered Pill (X/45) -->
+                <div class="px-2 py-1 rounded-xl bg-white/10 border border-white/10 flex items-center gap-1 text-[11px] font-extrabold" title="Mastered Characters">
+                    <span class="text-goldaccent-400">★</span>
+                    <span id="hudMastered" class="text-white">0/45</span>
+                </div>
+
+                <!-- Interactive Chart Button -->
+                <button onclick="openChartModal()" class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-extrabold shadow-xs active:scale-95 transition flex items-center gap-1">
+                    <span class="font-limbu text-xs">ᤁ</span>
+                    <span>Chart</span>
+                </button>
+
+                <!-- Non-Intrusive Supporter Heart Button -->
+                <button onclick="openSupporterModal()" class="w-8 h-8 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/40 text-rose-300 flex items-center justify-center text-sm font-bold active:scale-95 transition" aria-label="Support Yakthung Pan">
+                    ♥
+                </button>
+            </div>
+        </header>
+
+        <!-- ========================================================= -->
+        <!-- MAIN SCREEN: CANDY CRUSH-STYLE 17-LEVEL WINDING PATH      -->
+        <!-- ========================================================= -->
+        <main id="mapView" class="flex-1 overflow-y-auto relative">
+            <div id="windingMapContainer" class="relative w-full">
+                <!-- Dynamically populated by renderWindingMap() -->
+            </div>
+        </main>
+
+        <!-- NON-BLOCKING TOAST NOTIFICATION BANNER -->
+        <div id="toastBanner" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 -translate-y-2 w-[90%] max-w-[400px]">
+            <div class="bg-slatebrand-900/95 backdrop-blur text-parchment-50 px-4 py-2.5 rounded-2xl shadow-xl border border-goldaccent-400/50 flex items-center justify-center gap-2 text-xs font-semibold text-center">
+                <span id="toastIcon" class="text-goldaccent-400 text-base shrink-0">✦</span>
+                <span id="toastMessage">Welcome!</span>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODAL 1: 5-TAB SIRIJONGA SAK-SAK COMPLETE CHART           -->
+        <!-- ========================================================= -->
+        <div id="chartModal" class="hidden fixed inset-0 z-40 flex justify-center bg-slate-950/80 backdrop-blur-sm">
+            <div class="w-full max-w-[460px] bg-parchment-50 h-full flex flex-col shadow-2xl overflow-hidden">
+                <div class="bg-slatebrand-900 text-white px-4 py-3 flex items-center justify-between border-b border-white/10 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <span class="font-limbu text-xl text-goldaccent-400">ᤁ</span>
+                        <div>
+                            <h2 class="text-sm font-extrabold leading-none">Yakthung Sirijonga Sak-sak</h2>
+                            <p class="text-[10px] text-parchment-200 mt-0.5">Tap any character, syllable, or numeral to explore</p>
+                        </div>
+                    </div>
+                    <button onclick="closeChartModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-bold transition" aria-label="Close Chart">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- 5-Tab Bar: Consonants (25), Vowels (9), Naukhari (9-Form), Matras & Marks, Numbers (0-10) -->
+                <div class="bg-parchment-200/80 px-2.5 py-2 border-b border-parchment-300 grid grid-cols-5 gap-1 shrink-0">
+                    <button id="chartTab_consonants" onclick="switchChartTab('consonants')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-slatebrand-900 text-goldaccent-400 shadow-xs transition leading-tight">
+                        Consonants<br><span class="text-[9px] opacity-85">(25)</span>
+                    </button>
+                    <button id="chartTab_vowels" onclick="switchChartTab('vowels')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-white text-slate-700 border border-parchment-300 transition leading-tight">
+                        Vowels<br><span class="text-[9px] opacity-85">(9)</span>
+                    </button>
+                    <button id="chartTab_naukhari" onclick="switchChartTab('naukhari')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-white text-slate-700 border border-parchment-300 transition leading-tight">
+                        Naukhari<br><span class="text-[9px] opacity-85">(9-Form)</span>
+                    </button>
+                    <button id="chartTab_marks" onclick="switchChartTab('marks')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-white text-slate-700 border border-parchment-300 transition leading-tight">
+                        Matras<br><span class="text-[9px] opacity-85">& Marks</span>
+                    </button>
+                    <button id="chartTab_numbers" onclick="switchChartTab('numbers')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-white text-slate-700 border border-parchment-300 transition leading-tight">
+                        Numbers<br><span class="text-[9px] opacity-85">(0–10)</span>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-3.5 space-y-3">
+                    <div id="chartTabBody" class="space-y-3">
+                        <!-- Dynamically populated by switchChartTab() -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODAL 2: ACTIVE LESSON WORKSPACE (TRACE / QUIZ / TILES)   -->
+        <!-- ========================================================= -->
+        <div id="lessonModal" class="hidden fixed inset-0 z-40 flex justify-center bg-slate-950/80 backdrop-blur-sm">
+            <div class="w-full max-w-[460px] bg-parchment-50 h-full flex flex-col shadow-2xl overflow-hidden">
+                
+                <!-- Top Lesson Progress Header -->
+                <div class="bg-slatebrand-900 text-white px-4 py-3 flex items-center justify-between gap-3 border-b border-white/10 shrink-0">
+                    <button onclick="closeLessonModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-bold transition" aria-label="Exit Lesson">
+                        ✕
+                    </button>
+
+                    <div class="flex-1 flex flex-col gap-1">
+                        <div class="flex items-center justify-between text-[11px] font-bold">
+                            <span id="lessonHeaderTitle" class="text-goldaccent-400 truncate">Level 1 • Row 1</span>
+                            <span id="lessonStepCounter" class="text-parchment-200 shrink-0">1 / 4</span>
+                        </div>
+                        <div class="w-full h-2 bg-slatebrand-800 rounded-full overflow-hidden">
+                            <div id="lessonProgressBar" class="h-full bg-gradient-to-r from-emerald-500 to-goldaccent-400 transition-all duration-300" style="width: 25%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE A: TUNED FINGER-TRACING PAD (360px+ CANVAS)  -->
+                <!-- ================================================= -->
+                <div id="tracingWorkspace" class="hidden flex-1 overflow-y-auto p-3.5 flex flex-col justify-between gap-2.5">
+                    
+                    <!-- Compact Horizontal Reference Header -->
+                    <div class="bg-white rounded-3xl p-3 border border-parchment-300 shadow-xs flex items-center justify-between gap-2.5">
+                        <!-- Left: Glyph + Phonetics -->
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="w-14 h-14 rounded-2xl bg-parchment-50 border border-parchment-300 flex items-center justify-center shrink-0 shadow-inner">
+                                <span id="cardLimbuGlyph" class="font-limbu text-4xl text-slatebrand-900 leading-none">ᤁ</span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <span id="cardLatinSound" class="text-lg font-extrabold text-slatebrand-900 leading-none">Ka</span>
+                                    <span id="cardDevaSound" class="font-deva text-xs font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">क</span>
+                                </div>
+                                <p id="cardPhoneticHint" class="text-[10px] font-semibold text-slate-500 mt-1 truncate">Row 1 • Consonant</p>
+                            </div>
+                        </div>
+
+                        <!-- Center: Picture + Limbu Word Anchor -->
+                        <div class="flex items-center gap-2 bg-parchment-50/90 px-2.5 py-1.5 rounded-2xl border border-parchment-200 min-w-0">
+                            <span id="cardPictureEmoji" class="text-2xl shrink-0">🤝</span>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1">
+                                    <span id="cardAnchorLimbu" class="font-limbu text-sm font-bold text-slatebrand-900">ᤁᤠᤶ</span>
+                                    <span id="cardAnchorLatin" class="text-[11px] font-extrabold text-terracotta-600 truncate">Kam</span>
+                                </div>
+                                <p id="cardAnchorMeaning" class="text-[10px] font-semibold text-slate-500 truncate">Friend</p>
+                            </div>
+                        </div>
+
+                        <!-- Right: Listen Audio Button -->
+                        <button onclick="speakCurrentCharacter()" class="px-2.5 py-2 rounded-2xl bg-terracotta-600 hover:bg-terracotta-700 active:scale-95 text-white shadow-xs flex flex-col items-center justify-center shrink-0 transition" aria-label="Listen">
+                            <span class="text-sm leading-none">🔊</span>
+                            <span class="text-[9px] font-extrabold mt-0.5">Listen</span>
+                        </button>
+                    </div>
+
+                    <!-- Large 360px+ Tracing Canvas Card -->
+                    <div class="bg-white rounded-3xl p-3 border border-parchment-300 shadow-sm flex-1 flex flex-col justify-between gap-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span id="accuracyBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                                Accuracy: 0% (Goal: 60%)
+                            </span>
+                            <button id="ghostToggleBtn" onclick="toggleGhostMode()" class="text-[11px] font-bold px-2.5 py-1 rounded-xl border bg-parchment-50 border-parchment-300 text-slatebrand-800 flex items-center gap-1 transition">
+                                <span id="ghostIcon">👁️</span>
+                                <span id="ghostText">Ghost: Off</span>
+                            </button>
+                        </div>
+
+                        <!-- Interactive Canvas Wrapper (min-h-[360px]) -->
+                        <div id="canvasBox" class="relative w-full flex-1 min-h-[360px] rounded-2xl border-2 border-dashed border-parchment-300 bg-parchment-50/40 overflow-hidden">
+                            <!-- Top-left instruction + live accuracy meter pill -->
+                            <div class="absolute top-2.5 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none z-10">
+                                <span class="text-[10px] font-bold text-slate-500 truncate">✍️ Trace over the dashed outline</span>
+                                <div class="px-2.5 py-1 rounded-full bg-white/95 border border-parchment-300 shadow-2xs flex items-center gap-1.5 shrink-0">
+                                    <div class="w-14 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                        <div id="matchMeterBar" class="h-full bg-goldaccent-400 transition-all duration-150" style="width: 0%"></div>
+                                    </div>
+                                    <span id="matchMeterText" class="text-[10px] font-extrabold text-slatebrand-900">0%</span>
+                                </div>
+                            </div>
+
+                            <canvas id="tracingCanvas" class="w-full h-full block"></canvas>
+                        </div>
+
+                        <!-- Bottom Canvas Action Controls -->
+                        <div class="flex items-center gap-2 pt-0.5">
+                            <button onclick="resetTracingCanvas()" class="px-4 py-3 rounded-xl font-bold text-xs bg-parchment-100 hover:bg-parchment-200 border border-parchment-300 text-slatebrand-800 active:scale-95 transition">
+                                ↺ Clear
+                            </button>
+                            <button id="nextLetterBtn" onclick="advanceTraceStep()" disabled class="flex-1 py-3 px-4 rounded-xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition-all flex items-center justify-center gap-1.5">
+                                <span id="nextLetterLabel">Trace 60% to Unlock</span>
+                                <span>→</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE B: BOSS RECOGNITION QUIZ (70% PASS GATE)     -->
+                <!-- ================================================= -->
+                <div id="quizWorkspace" class="hidden flex-1 overflow-y-auto p-4 flex flex-col justify-between gap-4">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <span id="quizBossBadge" class="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                                👑 Boss Script Quiz • 70% Goal
+                            </span>
+                            <span id="quizScoreTag" class="text-xs font-extrabold text-emerald-700">0/8 (0%)</span>
+                        </div>
+
+                        <!-- Live 70% Pass Threshold Progress Bar -->
+                        <div class="bg-white rounded-2xl px-3 py-2 border border-parchment-300 shadow-2xs space-y-1">
+                            <div class="flex items-center justify-between text-[10px] font-bold">
+                                <span id="quizAccuracyLabel" class="text-slate-600">Current Score: 0%</span>
+                                <span class="text-amber-700 font-extrabold">Pass Threshold: 70%</span>
+                            </div>
+                            <div class="relative w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                                <div id="quizPassFillBar" class="h-full bg-amber-400 transition-all duration-300" style="width: 0%"></div>
+                                <div class="absolute top-0 bottom-0 w-0.5 bg-slatebrand-900 z-10" style="left: 70%" title="70% Pass Goal"></div>
+                            </div>
+                        </div>
+
+                        <!-- Prompt Card (Supports Forward Script->Sound & Reverse Sound->Script) -->
+                        <div class="bg-white rounded-3xl p-4 border border-parchment-300 shadow-sm text-center space-y-1.5">
+                            <p id="quizPromptSub" class="text-xs font-bold text-slate-500">Identify this Sirijonga character:</p>
+                            <div id="quizBigGlyph" class="font-limbu text-7xl text-slatebrand-900 py-1.5 select-none">ᤁ</div>
+                            <div id="quizReverseDeva" class="hidden font-deva text-4xl font-extrabold text-emerald-700 py-1 select-none">क</div>
+                            <div id="quizReverseHint" class="hidden text-xs font-semibold text-slate-500">Meaning: Friend (Kam)</div>
+                            <button onclick="playQuizPromptAudio()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold hover:bg-emerald-100 active:scale-95 transition">
+                                <span>🔊</span>
+                                <span>Hear Sound</span>
+                            </button>
+                        </div>
+
+                        <!-- 4 Multiple Choice Options -->
+                        <div id="quizOptionsGrid" class="grid grid-cols-2 gap-2.5 pt-0.5">
+                            <!-- Injected via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Feedback & Next Button -->
+                    <div class="space-y-2.5">
+                        <div id="quizFeedbackBox" class="hidden p-3 rounded-2xl text-xs font-bold text-center"></div>
+                        <button id="quizNextBtn" onclick="advanceQuizStep()" disabled class="w-full py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition">
+                            Select an Answer
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE F: BOSS QUIZ RETRY GATE (< 70% SCORE)        -->
+                <!-- ================================================= -->
+                <div id="retryWorkspace" class="hidden flex-1 flex flex-col items-center justify-center text-center p-6 space-y-5">
+                    <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-rose-500 to-amber-600 p-1 shadow-xl">
+                        <div class="w-full h-full bg-slatebrand-900 rounded-[20px] flex flex-col items-center justify-center text-white">
+                            <span id="retryScorePct" class="text-2xl font-extrabold text-rose-400">60%</span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-parchment-200 mt-0.5">Goal: 70%</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <span class="inline-block text-[11px] font-extrabold uppercase tracking-wider px-3 py-0.5 rounded-full bg-rose-100 text-rose-800">
+                            70% Mastery Required
+                        </span>
+                        <h2 class="text-2xl font-extrabold text-slatebrand-900">Almost There!</h2>
+                        <p id="retrySubText" class="text-xs text-slate-600 max-w-xs mx-auto leading-relaxed">
+                            You scored 60%. Score at least 70% on this Boss Script Quiz to unlock the next level!
+                        </p>
+                    </div>
+
+                    <div id="retryMissedBox" class="hidden w-full max-w-xs bg-white rounded-2xl p-3 border border-parchment-300 shadow-xs space-y-1.5">
+                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Review These Characters (Tap to Hear):</div>
+                        <div id="retryMissedChips" class="flex flex-wrap items-center justify-center gap-1.5"></div>
+                    </div>
+
+                    <div class="w-full max-w-xs space-y-2.5 pt-1">
+                        <button onclick="retryCurrentBossQuiz()" class="w-full py-3.5 px-6 rounded-2xl font-extrabold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slatebrand-900 shadow-lg transition active:scale-95">
+                            ↺ Try Boss Quiz Again
+                        </button>
+                        <button onclick="closeLessonModal()" class="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-parchment-200 hover:bg-parchment-300 text-slate-700 transition">
+                            Back to Adventure Map
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE C: LEVEL 17 VILLAGE GREETINGS TILE-BUILDER   -->
+                <!-- ================================================= -->
+                <div id="tileWorkspace" class="hidden flex-1 overflow-y-auto p-4 flex flex-col justify-between gap-4">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                🏔️ Village Phrase Builder
+                            </span>
+                            <button onclick="playCurrentTileAudio()" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-600 text-white shadow-xs active:scale-95 flex items-center gap-1">
+                                <span>🔊</span>
+                                <span>Listen</span>
+                            </button>
+                        </div>
+
+                        <!-- Meaning Prompt Card -->
+                        <div class="bg-white rounded-3xl p-4 border border-parchment-300 shadow-sm space-y-1.5">
+                            <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Translate into Limbu (Yakthung Pan)</span>
+                            <div class="flex items-center gap-3">
+                                <span id="tilePromptEmoji" class="text-3xl">🙏</span>
+                                <div>
+                                    <h3 id="tilePromptEnglish" class="text-base font-extrabold text-slatebrand-900">Respectful Greeting / Namaste</h3>
+                                    <p id="tilePromptNepali" class="font-deva text-xs font-semibold text-slate-600">नेपाली: नमस्कार / सेवारो</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Answer Assembly Slots -->
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Your Limbu Phrase:</span>
+                            <div id="tileAnswerTray" class="min-h-[68px] bg-white rounded-2xl p-2.5 border-2 border-dashed border-emerald-400 flex flex-wrap items-center gap-2">
+                                <span class="text-xs text-slate-400 italic">Tap tiles below to build the phrase...</span>
+                            </div>
+                        </div>
+
+                        <!-- Scrambled Word Bank -->
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Word Bank:</span>
+                            <div id="tileBankTray" class="min-h-[76px] bg-parchment-200/60 rounded-2xl p-2.5 border border-parchment-300 flex flex-wrap items-center justify-center gap-2">
+                                <!-- Scrambled tiles injected via JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Check & Continue Controls -->
+                    <div class="space-y-2">
+                        <div id="tileFeedbackBox" class="hidden p-3 rounded-2xl text-xs font-bold text-center"></div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="clearCurrentTileSelection()" class="px-4 py-3.5 rounded-2xl font-bold text-xs bg-white border border-parchment-300 text-slate-700 shadow-xs active:scale-95">
+                                ↺ Reset
+                            </button>
+                            <button id="tileActionBtn" onclick="handleTileAction()" disabled class="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition">
+                                Check Answer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE D: SAKNAM-BHAN (NAUKHARI) & MARKS BUILDER    -->
+                <!-- ================================================= -->
+                <div id="saknamWorkspace" class="hidden flex-1 overflow-y-auto p-4 flex flex-col justify-between gap-4">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span id="saknamBadge" class="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-purple-100 text-purple-900 border border-purple-300">
+                                🔤 Saknam-bhan (Naukhari)
+                            </span>
+                            <button onclick="playCurrentSaknamAudio()" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-600 text-white shadow-xs active:scale-95 flex items-center gap-1">
+                                <span>🔊</span>
+                                <span>Listen</span>
+                            </button>
+                        </div>
+
+                        <!-- Target Syllable / Mark Card -->
+                        <div class="bg-white rounded-3xl p-4 border border-parchment-300 shadow-sm text-center space-y-1.5">
+                            <span id="saknamInstruction" class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">
+                                Combine Consonant + Vowel Matra
+                            </span>
+                            <div class="flex items-center justify-center gap-3 py-1">
+                                <div class="px-4 py-2 rounded-2xl bg-parchment-50 border border-parchment-300 shadow-inner">
+                                    <div id="saknamTargetDeva" class="font-deva text-3xl font-extrabold text-slatebrand-900">का</div>
+                                    <div id="saknamTargetLatin" class="text-xs font-extrabold text-emerald-700">Kaa</div>
+                                </div>
+                                <div class="text-left space-y-0.5">
+                                    <div id="saknamRuleTitle" class="text-xs font-extrabold text-slatebrand-900">Ka (ᤁ) + Amma (ᤠ)</div>
+                                    <p id="saknamRuleDesc" class="text-[11px] text-slate-600">Add the Amma matra to lengthen the vowel.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4 Syllable / Mark Choices -->
+                        <div id="saknamOptionsGrid" class="grid grid-cols-2 gap-2.5 pt-1">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div id="saknamFeedbackBox" class="hidden p-3 rounded-2xl text-xs font-bold text-center"></div>
+                        <button id="saknamNextBtn" onclick="advanceSaknamStep()" disabled class="w-full py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition">
+                            Select the Matching Form
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE E: 3-STAR VICTORY CELEBRATION SCREEN         -->
+                <!-- ================================================= -->
+                <div id="victoryWorkspace" class="hidden flex-1 flex flex-col items-center justify-center text-center p-6 space-y-5">
+                    <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-goldaccent-400 to-emerald-600 p-1 shadow-xl">
+                        <div class="w-full h-full bg-slatebrand-900 rounded-[20px] flex flex-col items-center justify-center text-white">
+                            <span class="font-limbu text-3xl text-goldaccent-400">ᤛᤣᤘᤠᤖᤥ</span>
+                            <span class="text-[10px] font-bold uppercase tracking-widest mt-0.5 text-parchment-200">Sewaro!</span>
+                        </div>
+                    </div>
+
+                    <div id="victoryStarsDisplay" class="flex items-center justify-center gap-2 text-4xl text-goldaccent-400">
+                        <span>★</span><span>★</span><span>★</span>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-center gap-2">
+                            <span id="victoryBadgeText" class="inline-block text-[11px] font-extrabold uppercase tracking-wider px-3 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                Level Completed!
+                            </span>
+                            <span id="victoryXpPill" class="inline-block text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                                +40 XP
+                            </span>
+                        </div>
+                        <h2 id="victoryHeadline" class="text-2xl font-extrabold text-slatebrand-900">Kheni! Well Done!</h2>
+                        <p id="victorySubText" class="text-xs text-slate-600 max-w-xs mx-auto">
+                            Next stage unlocked on your Yakthung Pan adventure path.
+                        </p>
+                    </div>
+
+                    <button onclick="finishLevelAndReturn()" class="w-full max-w-xs py-3.5 px-6 rounded-2xl font-extrabold text-sm bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg transition active:scale-95">
+                        Continue on Map →
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODAL 3: NON-INTRUSIVE SUPPORTER & AUDIO STUDIO MODAL     -->
+        <!-- ========================================================= -->
+        <div id="supporterModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <div class="w-full max-w-[400px] bg-parchment-50 rounded-3xl border border-parchment-300 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="dhaka-header text-white px-4 py-3.5 flex items-center justify-between border-b border-emerald-700/50">
+                    <div class="flex items-center gap-2">
+                        <span class="text-rose-400 text-lg">♥</span>
+                        <h2 class="text-sm font-extrabold">Supporter & Audio Studio</h2>
+                    </div>
+                    <button onclick="closeSupporterModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-bold">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="p-4 overflow-y-auto space-y-4 text-xs text-slate-700">
+                    <!-- Mission Note -->
+                    <div class="bg-white rounded-2xl p-3.5 border border-parchment-200 space-y-1.5">
+                        <div class="flex items-center gap-2">
+                            <span class="font-limbu text-xl text-emerald-700">ᤛᤣᤘᤠᤖᤥ</span>
+                            <h3 class="font-extrabold text-slatebrand-900 text-sm">100% Free & Ad-Free Heritage Learning</h3>
+                        </div>
+                        <p class="leading-relaxed text-slate-600">
+                            Yakthung Pan keeps Sirijonga script and Limbu language lessons free from disruptive pop-up ads. Community patrons help fund native speaker voice recordings across Panchthare, Phedape, Taplejunge, and Chhathare dialects.
+                        </p>
+                    </div>
+
+                    <!-- Support Options -->
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button onclick="handleSupportAction('eSewa / Khalti ID copied: 9800000000 (Yakthung Pan)')" class="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-left space-y-1 transition active:scale-95">
+                            <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-600 text-white">Nepal Local</span>
+                            <div class="font-extrabold text-slatebrand-900 text-xs">eSewa / Khalti</div>
+                            <p class="text-[10px] text-slate-600">Tap to copy supporter ID</p>
+                        </button>
+
+                        <button onclick="handleSupportAction('Thank you! Diaspora Chiya / Ko-fi link copied.')" class="p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-left space-y-1 transition active:scale-95">
+                            <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-600 text-white">Diaspora</span>
+                            <div class="font-extrabold text-slatebrand-900 text-xs">Buy Us Chiya</div>
+                            <p class="text-[10px] text-slate-600">Support audio preservation</p>
+                        </button>
+                    </div>
+
+                    <!-- Complete Curriculum Overview -->
+                    <div class="bg-white rounded-2xl p-3 border border-parchment-200 space-y-1">
+                        <h4 class="font-extrabold text-slatebrand-900">Complete Sirijonga Sak-sak Curriculum</h4>
+                        <p class="text-[11px] text-slate-600 leading-relaxed">
+                            Covers all 25 Consonants (<span class="font-limbu font-bold">ᤁ</span>–<span class="font-limbu font-bold">ᤜ</span> + <span class="font-limbu font-bold">ᤄ</span>), 9 Kubung-sak Vowels (<span class="font-limbu font-bold">ᤀ</span>–<span class="font-limbu font-bold">ᤀᤧ</span>), 9-Form Naukhari matrix, 8 Saknam-sak Matras, Chuk-sak finals, Ektum-sak conjuncts, Kusek-sak marks, and Khanin numerals (<span class="font-limbu font-bold">᥆</span>–<span class="font-limbu font-bold">᥇᥆</span>).
+                        </p>
+                    </div>
+
+                    <!-- Progress Summary & Two-Step Reset -->
+                    <div class="pt-2 border-t border-parchment-200 flex items-center justify-between gap-2">
+                        <div class="text-[11px] text-slate-500">
+                            <span id="modalStatsSummary" class="font-bold text-slatebrand-800">0/45 Items Mastered</span>
+                        </div>
+
+                        <div id="resetConfirmGroup">
+                            <button onclick="promptResetProgress()" class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] transition">
+                                Reset Progress
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- COMPLETE APPLICATION ENGINE (DATA, CANVAS, QUIZ, STORAGE) -->
+    <!-- ========================================================= -->
+    <script>
+        /**
+         * 1. COMPLETE AUTHENTIC SIRIJONGA SAK-SAK CURRICULUM DATA
+         * - 25 Consonants (Kudhuku-sak: ᤁ Ka to ᤜ Ha + ᤄ Gha)
+         * - 9 Vowels (Kubung-sak: ᤀ A to ᤀᤧ Ae)
+         * - 11 Numerals (Khanin: ᥆ Thip to ᥇᥆ Thiboong)
+         * - Total = 45 traceable items
+         */
+        const SIRIJONGA_25 = [
+            // Row 1
+            { id: 'ka',   row: 1, category: 'Consonant', char: 'ᤁ', latin: 'Ka',   deva: 'क',    devaBase: 'क', wordLimbu: 'ᤁᤠᤶ',     wordLatin: 'Kam',     meaning: 'Friend / Companion', emoji: '🤝', freq: 261.6 },
+            { id: 'kha',  row: 1, category: 'Consonant', char: 'ᤂ', latin: 'Kha',  deva: 'ख',    devaBase: 'ख', wordLimbu: 'ᤂᤠᤶ',     wordLatin: 'Kham',    meaning: 'Soil / Earth',       emoji: '🌱', freq: 277.2 },
+            { id: 'ga',   row: 1, category: 'Consonant', char: 'ᤃ', latin: 'Ga',   deva: 'ग',    devaBase: 'ग', wordLimbu: 'ᤃᤠᤶ',     wordLatin: 'Gam',     meaning: 'Step / Pace',        emoji: '👣', freq: 293.7 },
+            { id: 'nga',  row: 1, category: 'Consonant', char: 'ᤅ', latin: 'Nga',  deva: 'ङ',    devaBase: 'ङ', wordLimbu: 'ᤅᤠ',      wordLatin: 'Nga',     meaning: 'Fish',               emoji: '🐟', freq: 311.1 },
+            // Row 2
+            { id: 'cha',  row: 2, category: 'Consonant', char: 'ᤆ', latin: 'Cha',  deva: 'च',    devaBase: 'च', wordLimbu: 'ᤆᤠ',      wordLatin: 'Cha',     meaning: 'Food / Rice',        emoji: '🍚', freq: 329.6 },
+            { id: 'chha', row: 2, category: 'Consonant', char: 'ᤇ', latin: 'Chha', deva: 'छ/झ',  devaBase: 'छ', wordLimbu: 'ᤇᤠᤱ',     wordLatin: 'Chhang',  meaning: 'Child / Offspring',  emoji: '🧒', freq: 349.2 },
+            { id: 'ja',   row: 2, category: 'Consonant', char: 'ᤈ', latin: 'Ja',   deva: 'ज',    devaBase: 'ज', wordLimbu: 'ᤈᤠᤶ',     wordLatin: 'Jam',     meaning: 'Cooked Grain',       emoji: '🌾', freq: 370.0 },
+            { id: 'na',   row: 2, category: 'Consonant', char: 'ᤏ', latin: 'Na',   deva: 'न/ण',  devaBase: 'न', wordLimbu: 'ᤏᤠᤶ',     wordLatin: 'Nam',     meaning: 'Sun / Sunshine',     emoji: '☀️', freq: 392.0 },
+            // Row 3
+            { id: 'ta',   row: 3, category: 'Consonant', char: 'ᤋ', latin: 'Ta',   deva: 'त/ट',  devaBase: 'त', wordLimbu: 'ᤋᤠᤱ',     wordLatin: 'Tang',    meaning: 'Horn / Peak',        emoji: '🏔️', freq: 415.3 },
+            { id: 'tha',  row: 3, category: 'Consonant', char: 'ᤌ', latin: 'Tha',  deva: 'थ/ठ',  devaBase: 'थ', wordLimbu: 'ᤌᤠᤱ',     wordLatin: 'Thang',   meaning: 'Upward / Hill',      emoji: '⛰️', freq: 440.0 },
+            { id: 'da',   row: 3, category: 'Consonant', char: 'ᤍ', latin: 'Da',   deva: 'द/ड',  devaBase: 'द', wordLimbu: 'ᤍᤠᤱ',     wordLatin: 'Dang',    meaning: 'Pillar / Post',      emoji: '🪵', freq: 466.2 },
+            { id: 'dha',  row: 3, category: 'Consonant', char: 'ᤎ', latin: 'Dha',  deva: 'ध/ढ',  devaBase: 'ध', wordLimbu: 'ᤎᤠᤏ',     wordLatin: 'Dhan',    meaning: 'Harvest / Paddy',    emoji: '🌿', freq: 493.9 },
+            // Row 4
+            { id: 'pa',   row: 4, category: 'Consonant', char: 'ᤐ', latin: 'Pa',   deva: 'प',    devaBase: 'प', wordLimbu: 'ᤐᤠᤴ',     wordLatin: 'Pan',     meaning: 'Language / Speech',  emoji: '🗣️', freq: 523.3 },
+            { id: 'pha',  row: 4, category: 'Consonant', char: 'ᤑ', latin: 'Pha',  deva: 'फ',    devaBase: 'फ', wordLimbu: 'ᤑᤢᤱ',     wordLatin: 'Phung',   meaning: 'Flower / Blossom',   emoji: '🌺', freq: 554.4 },
+            { id: 'ba',   row: 4, category: 'Consonant', char: 'ᤒ', latin: 'Ba',   deva: 'ब',    devaBase: 'ब', wordLimbu: 'ᤒᤠᤖᤡ',   wordLatin: 'Bari',    meaning: 'Garden / Orchard',   emoji: '🏡', freq: 587.3 },
+            { id: 'bha',  row: 4, category: 'Consonant', char: 'ᤓ', latin: 'Bha',  deva: 'भ',    devaBase: 'भ', wordLimbu: 'ᤓᤠᤗᤣ',   wordLatin: 'Bhale',   meaning: 'Rooster',            emoji: '🐓', freq: 622.3 },
+            // Row 5
+            { id: 'ma',   row: 5, category: 'Consonant', char: 'ᤔ', latin: 'Ma',   deva: 'म',    devaBase: 'म', wordLimbu: 'ᤔᤠᤱ',     wordLatin: 'Mang',    meaning: 'Deity / Spirit',     emoji: '🪔', freq: 659.3 },
+            { id: 'ya',   row: 5, category: 'Consonant', char: 'ᤕ', latin: 'Ya',   deva: 'य',    devaBase: 'य', wordLimbu: 'ᤕᤰᤌᤢᤱ', wordLatin: 'Yakthung',meaning: 'Limbu / Hill Hero',  emoji: '🏹', freq: 698.5 },
+            { id: 'ra',   row: 5, category: 'Consonant', char: 'ᤖ', latin: 'Ra',   deva: 'र',    devaBase: 'र', wordLimbu: 'ᤖᤠᤶ',     wordLatin: 'Ram',     meaning: 'Strength / Grace',   emoji: '✨', freq: 740.0 },
+            { id: 'la',   row: 5, category: 'Consonant', char: 'ᤗ', latin: 'La',   deva: 'ल',    devaBase: 'ल', wordLimbu: 'ᤗᤠᤒᤠ',   wordLatin: 'Laba',    meaning: 'Moon',               emoji: '🌙', freq: 784.0 },
+            // Row 6
+            { id: 'wa',   row: 6, category: 'Consonant', char: 'ᤘ', latin: 'Wa',   deva: 'व',    devaBase: 'व', wordLimbu: 'ᤘᤠ',      wordLatin: 'Wa',      meaning: 'Water / Stream',     emoji: '💧', freq: 830.6 },
+            { id: 'sha',  row: 6, category: 'Consonant', char: 'ᤙ', latin: 'Sha',  deva: 'श',    devaBase: 'श', wordLimbu: 'ᤙᤠ',      wordLatin: 'Sha',     meaning: 'Meat / Feast',       emoji: '🍲', freq: 880.0 },
+            { id: 'sa',   row: 6, category: 'Consonant', char: 'ᤛ', latin: 'Sa',   deva: 'स',    devaBase: 'स', wordLimbu: 'ᤛᤣᤘᤠᤖᤥ', wordLatin: 'Sewaro',  meaning: 'Salutation / Hello', emoji: '🙏', freq: 932.3 },
+            { id: 'ha',   row: 6, category: 'Consonant', char: 'ᤜ', latin: 'Ha',   deva: 'ह',    devaBase: 'ह', wordLimbu: 'ᤜᤠᤱ',     wordLatin: 'Hang',    meaning: 'King / Sovereign',   emoji: '👑', freq: 987.8 },
+            // Row 7 (Bottom Centered)
+            { id: 'gha',  row: 7, category: 'Consonant', char: 'ᤄ', latin: 'Gha',  deva: 'घ',    devaBase: 'घ', wordLimbu: 'ᤄᤠᤶ',     wordLatin: 'Gham',    meaning: 'Warmth / Glow',      emoji: '🔥', freq: 1046.5 }
+        ];
+
+        const KUBUNG_VOWELS_9 = [
+            { id: 'v_a',  row: 1, category: 'Vowel', char: 'ᤀ',  latin: 'A',  deva: 'अ',  devaBase: 'अ',  wordLimbu: 'ᤀᤱᤃᤠ', wordLatin: 'Anga',   meaning: 'I / Me',          emoji: '🙋', freq: 293.7 },
+            { id: 'v_aa', row: 1, category: 'Vowel', char: 'ᤀᤠ', latin: 'Aa', deva: 'आ',  devaBase: 'आ',  wordLimbu: 'ᤀᤠᤶᤒᤠ', wordLatin: 'Amba',   meaning: 'Father',          emoji: '👨', freq: 329.6 },
+            { id: 'v_i',  row: 1, category: 'Vowel', char: 'ᤀᤡ', latin: 'I',  deva: 'इ',  devaBase: 'इ',  wordLimbu: 'ᤀᤡᤶ',   wordLatin: 'Im',     meaning: 'Sleep / Rest',    emoji: '😴', freq: 349.2 },
+            { id: 'v_u',  row: 2, category: 'Vowel', char: 'ᤀᤢ', latin: 'U',  deva: 'उ',  devaBase: 'उ',  wordLimbu: 'ᤀᤢᤶ',   wordLatin: 'Um',     meaning: 'Sweet / Honey',   emoji: '🍯', freq: 392.0 },
+            { id: 'v_e',  row: 2, category: 'Vowel', char: 'ᤀᤣ', latin: 'E',  deva: 'ए',  devaBase: 'ए',  wordLimbu: 'ᤀᤣᤰ',   wordLatin: 'Ek',     meaning: 'Back / Spine',    emoji: '🦴', freq: 440.0 },
+            { id: 'v_ai', row: 2, category: 'Vowel', char: 'ᤀᤤ', latin: 'Ai', deva: 'ऐ',  devaBase: 'ऐ',  wordLimbu: 'ᤀᤤᤴ',   wordLatin: 'Ain',    meaning: 'Today / Now',     emoji: '📅', freq: 493.9 },
+            { id: 'v_o',  row: 3, category: 'Vowel', char: 'ᤀᤥ', latin: 'O',  deva: 'ओ',  devaBase: 'ओ',  wordLimbu: 'ᤀᤥᤰ',   wordLatin: 'Ok',     meaning: 'Crow / Call',     emoji: '🐦', freq: 523.3 },
+            { id: 'v_au', row: 3, category: 'Vowel', char: 'ᤀᤦ', latin: 'Au', deva: 'औ',  devaBase: 'औ',  wordLimbu: 'ᤀᤦᤱ',   wordLatin: 'Aung',   meaning: 'Horse / Steed',   emoji: '🐎', freq: 587.3 },
+            { id: 'v_ae', row: 3, category: 'Vowel', char: 'ᤀᤧ', latin: 'Ae', deva: 'ए़', devaBase: 'ए',  wordLimbu: 'ᤀᤧᤴ',   wordLatin: 'Aen',    meaning: 'Song / Melody',   emoji: '🎶', freq: 659.3 }
+        ];
+
+        const KHANIN_NUMBERS = [
+            { id: 'num_0',  row: 1, category: 'Numeral (0)',  char: '᥆',   latin: '0',  deva: '०',  devaBase: 'शून्य', wordLimbu: 'ᤌᤡᤵ',   wordLatin: 'Thip',     meaning: 'Zero (0)',  emoji: '0️⃣', freq: 261.6 },
+            { id: 'num_1',  row: 1, category: 'Numeral (1)',  char: '᥇',   latin: '1',  deva: '१',  devaBase: 'एक',    wordLimbu: 'ᤌᤡᤰ',   wordLatin: 'Thik',     meaning: 'One (1)',   emoji: '1️⃣', freq: 293.7 },
+            { id: 'num_2',  row: 1, category: 'Numeral (2)',  char: '᥈',   latin: '2',  deva: '२',  devaBase: 'दुई',   wordLimbu: 'ᤏᤣᤳ',   wordLatin: 'Net',      meaning: 'Two (2)',   emoji: '2️⃣', freq: 329.6 },
+            { id: 'num_3',  row: 1, category: 'Numeral (3)',  char: '᥉',   latin: '3',  deva: '३',  devaBase: 'तीन',   wordLimbu: 'ᤛᤢᤶ',   wordLatin: 'Sum',      meaning: 'Three (3)', emoji: '3️⃣', freq: 349.2 },
+            { id: 'num_4',  row: 1, category: 'Numeral (4)',  char: '᥊',   latin: '4',  deva: '४',  devaBase: 'चार',   wordLimbu: 'ᤗᤡ',    wordLatin: 'Li',       meaning: 'Four (4)',  emoji: '4️⃣', freq: 392.0 },
+            { id: 'num_5',  row: 1, category: 'Numeral (5)',  char: '᥋',   latin: '5',  deva: '५',  devaBase: 'पाँच',  wordLimbu: 'ᤅᤠ',    wordLatin: 'Nga',      meaning: 'Five (5)',  emoji: '5️⃣', freq: 440.0 },
+            { id: 'num_6',  row: 2, category: 'Numeral (6)',  char: '᥌',   latin: '6',  deva: '६',  devaBase: 'छ',     wordLimbu: 'ᤋᤢᤰ',   wordLatin: 'Tuk',      meaning: 'Six (6)',   emoji: '6️⃣', freq: 493.9 },
+            { id: 'num_7',  row: 2, category: 'Numeral (7)',  char: '᥍',   latin: '7',  deva: '७',  devaBase: 'सात',   wordLimbu: 'ᤏᤢᤳ',   wordLatin: 'Nut',      meaning: 'Seven (7)', emoji: '7️⃣', freq: 523.3 },
+            { id: 'num_8',  row: 2, category: 'Numeral (8)',  char: '᥎',   latin: '8',  deva: '८',  devaBase: 'आठ',    wordLimbu: 'ᤕᤣᤳ',   wordLatin: 'Yet',      meaning: 'Eight (8)', emoji: '8️⃣', freq: 587.3 },
+            { id: 'num_9',  row: 2, category: 'Numeral (9)',  char: '᥏',   latin: '9',  deva: '९',  devaBase: 'नौ',    wordLimbu: 'ᤑᤠᤱ',   wordLatin: 'Phang',    meaning: 'Nine (9)',  emoji: '9️⃣', freq: 659.3 },
+            { id: 'num_10', row: 2, category: 'Numeral (10)', char: '᥇᥆', latin: '10', deva: '१०', devaBase: 'दस',    wordLimbu: 'ᤌᤡᤒᤢᤱ', wordLatin: 'Thiboong', meaning: 'Ten (10)',  emoji: '🔟', freq: 784.0 }
+        ];
+
+        const ALL_TRACEABLE_ITEMS = [...SIRIJONGA_25, ...KUBUNG_VOWELS_9, ...KHANIN_NUMBERS];
+
+        const NAUKHARI_FORMS = [
+            { name: 'Inherent', limbuMatra: '',  devaMatra: '',  latinSuffix: 'a',  toneOffset: 0 },
+            { name: 'Amma',     limbuMatra: 'ᤠ', devaMatra: 'ा', latinSuffix: 'aa', toneOffset: 40 },
+            { name: 'Iksu',     limbuMatra: 'ᤡ', devaMatra: 'ि', latinSuffix: 'i',  toneOffset: 80 },
+            { name: 'Uksu',     limbuMatra: 'ᤢ', devaMatra: 'ु', latinSuffix: 'u',  toneOffset: 120 },
+            { name: 'Ettu',     limbuMatra: 'ᤣ', devaMatra: 'े', latinSuffix: 'e',  toneOffset: 160 },
+            { name: 'Ainu',     limbuMatra: 'ᤤ', devaMatra: 'ै', latinSuffix: 'ai', toneOffset: 200 },
+            { name: 'Tumo',     limbuMatra: 'ᤥ', devaMatra: 'ो', latinSuffix: 'o',  toneOffset: 240 },
+            { name: 'Tumbo',    limbuMatra: 'ᤦ', devaMatra: 'ौ', latinSuffix: 'au', toneOffset: 280 },
+            { name: 'Pechwa',   limbuMatra: 'ᤧ', devaMatra: 'े़', latinSuffix: 'ae', toneOffset: 320 }
+        ];
+
+        const SAKNAM_MATRAS = [
+            { name: 'Amma (आम्मा)',   nepali: 'ा - आकार',  demo: 'ᤁᤠ', latin: 'Kaa', deva: 'का' },
+            { name: 'Iksu (इक्सु)',    nepali: 'ि - इकार',  demo: 'ᤁᤡ', latin: 'Ki',  deva: 'कि' },
+            { name: 'Uksu (उक्सु)',    nepali: 'ु - उकार',  demo: 'ᤁᤢ', latin: 'Ku',  deva: 'कु' },
+            { name: 'Ettu (एत्तु)',     nepali: 'े - एकार',  demo: 'ᤁᤣ', latin: 'Ke',  deva: 'के' },
+            { name: 'Ainu (ऐनु)',     nepali: 'ै - ऐकार',  demo: 'ᤁᤤ', latin: 'Kai', deva: 'कै' },
+            { name: 'Tumo (तुमो)',    nepali: 'ो - ओकार',  demo: 'ᤁᤥ', latin: 'Ko',  deva: 'को' },
+            { name: 'Tumbo (तुम्बो)', nepali: 'ौ - औकार',  demo: 'ᤁᤦ', latin: 'Kau', deva: 'कौ' },
+            { name: 'Pechwa (पेच्व)', nepali: 'े़ - ए़कार', demo: 'ᤁᤧ', latin: 'Kae', deva: 'के़' }
+        ];
+
+        const CHUK_FINALS = [
+            { demo: 'ᤁᤰ', sound: '-क् (-k)' },
+            { demo: 'ᤁᤱ', sound: '-ङ् (-ng)' },
+            { demo: 'ᤁᤳ', sound: '-त् (-t)' },
+            { demo: 'ᤁᤵ', sound: '-प् (-p)' },
+            { demo: 'ᤁᤶ', sound: '-म् (-m)' },
+            { demo: 'ᤁᤷ', sound: '-र् (-r)' },
+            { demo: 'ᤁᤸ', sound: '-ल् (-l)' }
+        ];
+
+        const EKTUM_CONJUNCTS = [
+            { name: 'Ektum-ya (ᤩ)', demo: 'ᤁᤩᤠ', meaning: 'Subjoined -ya cluster (e.g., Kya / Chya)' },
+            { name: 'Ektum-ra (ᤪ)', demo: 'ᤁᤪᤠ', meaning: 'Subjoined -ra cluster (e.g., Kra / Pra)' },
+            { name: 'Ektum-wa (ᤫ)', demo: 'ᤁᤫᤠ', meaning: 'Subjoined -wa cluster (e.g., Kwa / Chwa)' }
+        ];
+
+        const KUSEK_MARKS = [
+            { name: 'Muphreng (᤹)',   demo: 'ᤁ᤹', meaning: 'Glottal stop / abrupt check sound' },
+            { name: 'Kemphreng (᤺)', demo: 'ᤁᤠ᤺', meaning: 'Vowel lengthening / sustained tone' },
+            { name: 'Sa-i (᤻)',       demo: 'ᤁ᤻', meaning: 'Halanta / pure consonant killer mark' }
+        ];
+
+        const SAKNAM_LEVEL_13_ITEMS = [
+            {
+                badge: '🔤 Saknam-bhan • Amma',
+                instruction: 'Combine Ka + Amma Matra (आम्मा)',
+                targetDeva: 'का',
+                targetLatin: 'Kaa',
+                ruleTitle: 'Ka (ᤁ) + Amma (ᤠ)',
+                ruleDesc: 'Amma adds the long "aa" sound to any consonant.',
+                answer: 'ᤁᤠ',
+                options: [
+                    { limbu: 'ᤁᤠ', label: 'Kaa (Amma)' },
+                    { limbu: 'ᤁᤡ', label: 'Ki (Iksu)' },
+                    { limbu: 'ᤁᤢ', label: 'Ku (Uksu)' },
+                    { limbu: 'ᤁᤣ', label: 'Ke (Ettu)' }
+                ]
+            },
+            {
+                badge: '🔤 Saknam-bhan • Iksu',
+                instruction: 'Combine Pa + Iksu Matra (इक्सु)',
+                targetDeva: 'पि',
+                targetLatin: 'Pi',
+                ruleTitle: 'Pa (ᤐ) + Iksu (ᤡ)',
+                ruleDesc: 'Iksu attaches the "i" vowel mark above the letter.',
+                answer: 'ᤐᤡ',
+                options: [
+                    { limbu: 'ᤐᤠ', label: 'Paa (Amma)' },
+                    { limbu: 'ᤐᤡ', label: 'Pi (Iksu)' },
+                    { limbu: 'ᤐᤥ', label: 'Po (Tumo)' },
+                    { limbu: 'ᤐᤧ', label: 'Pae (Pechwa)' }
+                ]
+            },
+            {
+                badge: '🔤 Saknam-bhan • Uksu',
+                instruction: 'Combine Ma + Uksu Matra (उक्सु)',
+                targetDeva: 'मु',
+                targetLatin: 'Mu',
+                ruleTitle: 'Ma (ᤔ) + Uksu (ᤢ)',
+                ruleDesc: 'Uksu loops underneath to create the "u" vowel.',
+                answer: 'ᤔᤢ',
+                options: [
+                    { limbu: 'ᤔᤣ', label: 'Me (Ettu)' },
+                    { limbu: 'ᤔᤤ', label: 'Mai (Ainu)' },
+                    { limbu: 'ᤔᤢ', label: 'Mu (Uksu)' },
+                    { limbu: 'ᤔᤦ', label: 'Mau (Tumbo)' }
+                ]
+            },
+            {
+                badge: '🔤 Saknam-bhan • Ettu & Ainu',
+                instruction: 'Combine Sa + Ettu Matra (एत्तु)',
+                targetDeva: 'से',
+                targetLatin: 'Se (as in Sewaro)',
+                ruleTitle: 'Sa (ᤛ) + Ettu (ᤣ)',
+                ruleDesc: 'Used in "Sewaro" (ᤛᤣᤘᤠᤖᤥ) for the "e" vowel.',
+                answer: 'ᤛᤣ',
+                options: [
+                    { limbu: 'ᤛᤣ', label: 'Se (Ettu)' },
+                    { limbu: 'ᤛᤤ', label: 'Sai (Ainu)' },
+                    { limbu: 'ᤛᤥ', label: 'So (Tumo)' },
+                    { limbu: 'ᤛᤠ', label: 'Saa (Amma)' }
+                ]
+            },
+            {
+                badge: '🔤 Saknam-bhan • Tumo & Tumbo',
+                instruction: 'Combine Ra + Tumo Matra (तुमो)',
+                targetDeva: 'रो',
+                targetLatin: 'Ro (as in Sewaro)',
+                ruleTitle: 'Ra (ᤖ) + Tumo (ᤥ)',
+                ruleDesc: 'Tumo combines upper and right strokes for "o".',
+                answer: 'ᤖᤥ',
+                options: [
+                    { limbu: 'ᤖᤢ', label: 'Ru (Uksu)' },
+                    { limbu: 'ᤖᤦ', label: 'Rau (Tumbo)' },
+                    { limbu: 'ᤖᤥ', label: 'Ro (Tumo)' },
+                    { limbu: 'ᤖᤧ', label: 'Rae (Pechwa)' }
+                ]
+            }
+        ];
+
+        const MARKS_LEVEL_14_ITEMS = [
+            {
+                badge: '✨ Chuk-sak • Subjoined Final',
+                instruction: 'Select Final -k (चुक्-सक् -क्)',
+                targetDeva: 'यक् (Yak)',
+                targetLatin: 'Ya + Subjoined -k',
+                ruleTitle: 'Ya (ᤕ) + Chuk-k (ᤰ)',
+                ruleDesc: 'First syllable of "Yakthung" (ᤕᤰᤌᤢᤱ).',
+                answer: 'ᤕᤰ',
+                options: [
+                    { limbu: 'ᤕᤰ', label: 'Yak (-k)' },
+                    { limbu: 'ᤕᤱ', label: 'Yang (-ng)' },
+                    { limbu: 'ᤕᤶ', label: 'Yam (-m)' },
+                    { limbu: 'ᤕᤳ', label: 'Yat (-t)' }
+                ]
+            },
+            {
+                badge: '✨ Chuk-sak • Nasal Final',
+                instruction: 'Select Final -ng (चुक्-सक् -ङ्)',
+                targetDeva: 'थुङ् (Thung)',
+                targetLatin: 'Thu + Subjoined -ng',
+                ruleTitle: 'Thu (ᤌᤢ) + Chuk-ng (ᤱ)',
+                ruleDesc: 'Second syllable of "Yakthung" (ᤕᤰᤌᤢᤱ).',
+                answer: 'ᤌᤢᤱ',
+                options: [
+                    { limbu: 'ᤌᤢᤵ', label: 'Thup (-p)' },
+                    { limbu: 'ᤌᤢᤱ', label: 'Thung (-ng)' },
+                    { limbu: 'ᤌᤢᤷ', label: 'Thur (-r)' },
+                    { limbu: 'ᤌᤢᤸ', label: 'Thul (-l)' }
+                ]
+            },
+            {
+                badge: '✨ Ektum-sak • Conjunct Cluster',
+                instruction: 'Select Conjunct -ya (एक्टुम-सक्)',
+                targetDeva: 'च्या (Chya)',
+                targetLatin: 'Cha + Ektum-ya + Amma',
+                ruleTitle: 'Cha (ᤆ) + Ektum-ya (ᤩ) + ᤠ',
+                ruleDesc: 'Used in "Chyabrung" (ᤆᤩᤠᤒᤪᤢᤱ) traditional drum.',
+                answer: 'ᤆᤩᤠ',
+                options: [
+                    { limbu: 'ᤆᤩᤠ', label: 'Chya (-ya)' },
+                    { limbu: 'ᤆᤪᤠ', label: 'Chra (-ra)' },
+                    { limbu: 'ᤆᤫᤠ', label: 'Chwa (-wa)' },
+                    { limbu: 'ᤆᤠ',  label: 'Chaa (plain)' }
+                ]
+            },
+            {
+                badge: '✨ Kusek-sak • Sound Marks',
+                instruction: 'Identify Muphreng Glottal Stop (मुफ्रेङ्)',
+                targetDeva: 'कः (Kaʼ)',
+                targetLatin: 'Ka + Muphreng (᤹)',
+                ruleTitle: 'Muphreng Glottal Check (᤹)',
+                ruleDesc: 'Creates a crisp glottal catch in Limbu syllables.',
+                answer: 'ᤁ᤹',
+                options: [
+                    { limbu: 'ᤁ᤹',  label: 'Muphreng (᤹)' },
+                    { limbu: 'ᤁᤠ᤺', label: 'Kemphreng (᤺)' },
+                    { limbu: 'ᤁ᤻',  label: 'Sa-i (᤻)' },
+                    { limbu: 'ᤁᤶ',  label: 'Chuk-m (ᤶ)' }
+                ]
+            }
+        ];
+
+        const VILLAGE_PHRASES = [
+            {
+                emoji: '🙏',
+                english: 'Respectful Greeting / Hello',
+                nepali: 'नेपाली: नमस्कार / सेवारो',
+                pronounce: 'Sewaro',
+                tiles: [
+                    { limbu: 'ᤛᤣᤘᤠᤖᤥ', latin: 'Sewaro' }
+                ],
+                distractors: [
+                    { limbu: 'ᤁᤠᤶ', latin: 'Kam' },
+                    { limbu: 'ᤘᤠ', latin: 'Wa' }
+                ]
+            },
+            {
+                emoji: '🤝',
+                english: 'My Friend / Companion',
+                nepali: 'नेपाली: मेरो साथी',
+                pronounce: 'Anga Kam',
+                tiles: [
+                    { limbu: 'ᤀᤱᤃᤠ', latin: 'Anga' },
+                    { limbu: 'ᤁᤠᤶ', latin: 'Kam' }
+                ],
+                distractors: [
+                    { limbu: 'ᤏᤠᤶ', latin: 'Nam' },
+                    { limbu: 'ᤛᤣᤘᤠᤖᤥ', latin: 'Sewaro' }
+                ]
+            },
+            {
+                emoji: '🏔️',
+                english: 'Limbu Language',
+                nepali: 'नेपाली: लिम्बु भाषा',
+                pronounce: 'Yakthung Pan',
+                tiles: [
+                    { limbu: 'ᤕᤰᤌᤢᤱ', latin: 'Yakthung' },
+                    { limbu: 'ᤐᤠᤴ', latin: 'Pan' }
+                ],
+                distractors: [
+                    { limbu: 'ᤑᤢᤱ', latin: 'Phung' },
+                    { limbu: 'ᤗᤠᤒᤠ', latin: 'Laba' }
+                ]
+            },
+            {
+                emoji: '💧',
+                english: 'Drink Water',
+                nepali: 'नेपाली: पानी पिउनुहोस्',
+                pronounce: 'Wa Thung-e',
+                tiles: [
+                    { limbu: 'ᤘᤠ', latin: 'Wa' },
+                    { limbu: 'ᤌᤢᤱᤀᤣ', latin: 'Thung-e' }
+                ],
+                distractors: [
+                    { limbu: 'ᤆᤠ', latin: 'Cha' },
+                    { limbu: 'ᤂᤠᤶ', latin: 'Kham' }
+                ]
+            },
+            {
+                emoji: '🍚',
+                english: 'Eat Food / Meal',
+                nepali: 'नेपाली: खाना खानुहोस्',
+                pronounce: 'Cha Cho-e',
+                tiles: [
+                    { limbu: 'ᤆᤠ', latin: 'Cha' },
+                    { limbu: 'ᤆᤥᤀᤣ', latin: 'Cho-e' }
+                ],
+                distractors: [
+                    { limbu: 'ᤘᤠ', latin: 'Wa' },
+                    { limbu: 'ᤐᤠᤴ', latin: 'Pan' }
+                ]
+            }
+        ];
+
+        /**
+         * 2. 17-LEVEL ADVENTURE ARCHITECTURE ACROSS 5 CHAPTERS
+         */
+        const ALL_25_CONSONANT_IDS = SIRIJONGA_25.map(c => c.id);
+
+        const CHAPTERS = [
+            {
+                id: 1,
+                title: 'Chapter 1: Sirijonga Roots',
+                subtitle: 'Rows 1–3 Consonants & Boss Quiz I (70%)',
+                badgeColor: 'bg-emerald-700 text-white'
+            },
+            {
+                id: 2,
+                title: 'Chapter 2: Deep Script Mastery',
+                subtitle: 'Rows 4–7 (Pa–Gha) & Boss Quiz II (70%)',
+                badgeColor: 'bg-terracotta-600 text-white'
+            },
+            {
+                id: 3,
+                title: 'Chapter 3: Grand Script Trials',
+                subtitle: 'All 25 Consonants: Forward & Reverse (70%)',
+                badgeColor: 'bg-amber-600 text-white'
+            },
+            {
+                id: 4,
+                title: 'Chapter 4: Kubung-sak & Saknam-bhan',
+                subtitle: '9 Vowels, 8 Matras, Chuk-sak & Sound Marks',
+                badgeColor: 'bg-purple-700 text-white'
+            },
+            {
+                id: 5,
+                title: 'Chapter 5: Khanin & Village Greetings',
+                subtitle: 'Limbu Numerals 0–10 & Everyday Phrases',
+                badgeColor: 'bg-slatebrand-900 text-goldaccent-400'
+            }
+        ];
+
+        const ADVENTURE_LEVELS = [
+            // Chapter 1: Sirijonga Roots
+            { levelNum: 1,  chapter: 1, type: 'trace',  title: 'Row 1: Ka – Nga',      icon: 'ᤁ', letterIds: ['ka', 'kha', 'ga', 'nga'] },
+            { levelNum: 2,  chapter: 1, type: 'trace',  title: 'Row 2: Cha – Na',      icon: 'ᤆ', letterIds: ['cha', 'chha', 'ja', 'na'] },
+            { levelNum: 3,  chapter: 1, type: 'trace',  title: 'Row 3: Ta – Dha',      icon: 'ᤋ', letterIds: ['ta', 'tha', 'da', 'dha'] },
+            { levelNum: 4,  chapter: 1, type: 'quiz',   title: 'Boss I: Rows 1–3',     icon: '👑', isBoss: true, quizMode: 'forward', questionCount: 8,  passThreshold: 70, xpReward: 60,  poolIds: ['ka', 'kha', 'ga', 'nga', 'cha', 'chha', 'ja', 'na', 'ta', 'tha', 'da', 'dha'] },
+
+            // Chapter 2: Deep Script Mastery
+            { levelNum: 5,  chapter: 2, type: 'trace',  title: 'Row 4: Pa – Bha',      icon: 'ᤐ', letterIds: ['pa', 'pha', 'ba', 'bha'] },
+            { levelNum: 6,  chapter: 2, type: 'trace',  title: 'Row 5: Ma – La',       icon: 'ᤔ', letterIds: ['ma', 'ya', 'ra', 'la'] },
+            { levelNum: 7,  chapter: 2, type: 'trace',  title: 'Rows 6–7: Wa – Gha',   icon: 'ᤘ', letterIds: ['wa', 'sha', 'sa', 'ha', 'gha'] },
+            { levelNum: 8,  chapter: 2, type: 'quiz',   title: 'Boss II: Rows 4–7',    icon: '👑', isBoss: true, quizMode: 'forward', questionCount: 9,  passThreshold: 70, xpReward: 70,  poolIds: ['pa', 'pha', 'ba', 'bha', 'ma', 'ya', 'ra', 'la', 'wa', 'sha', 'sa', 'ha', 'gha'] },
+
+            // Chapter 3: Grand Script Trials
+            { levelNum: 9,  chapter: 3, type: 'quiz',   title: 'Grand Boss I (All 25)',icon: '🏆', isBoss: true, quizMode: 'forward', questionCount: 12, passThreshold: 70, xpReward: 90,  poolIds: ALL_25_CONSONANT_IDS },
+            { levelNum: 10, chapter: 3, type: 'quiz',   title: 'Grand Boss II (Reverse)',icon: '🔥', isBoss: true, quizMode: 'reverse', questionCount: 12, passThreshold: 70, xpReward: 100, poolIds: ALL_25_CONSONANT_IDS },
+
+            // Chapter 4: Kubung-sak & Saknam-bhan
+            { levelNum: 11, chapter: 4, type: 'trace',  title: 'Vowels I: A – E',      icon: 'ᤀ', letterIds: ['v_a', 'v_aa', 'v_i', 'v_u', 'v_e'] },
+            { levelNum: 12, chapter: 4, type: 'trace',  title: 'Vowels II: Ai – Ae',   icon: 'ᤀᤤ', letterIds: ['v_ai', 'v_o', 'v_au', 'v_ae'] },
+            { levelNum: 13, chapter: 4, type: 'saknam', title: 'Saknam-bhan Naukhari', icon: 'ᤁᤠ', items: SAKNAM_LEVEL_13_ITEMS },
+            { levelNum: 14, chapter: 4, type: 'saknam', title: 'Chuk-sak & Marks',     icon: 'ᤁᤰ', items: MARKS_LEVEL_14_ITEMS },
+
+            // Chapter 5: Khanin & Village Greetings
+            { levelNum: 15, chapter: 5, type: 'trace',  title: 'Khanin: Numbers 0–5',  icon: '᥇', letterIds: ['num_0', 'num_1', 'num_2', 'num_3', 'num_4', 'num_5'] },
+            { levelNum: 16, chapter: 5, type: 'trace',  title: 'Khanin: Numbers 6–10', icon: '᥇᥆', letterIds: ['num_6', 'num_7', 'num_8', 'num_9', 'num_10'] },
+            { levelNum: 17, chapter: 5, type: 'tiles',  title: 'Village Greetings',    icon: '🏔️', isBoss: true }
+        ];
+
+        /**
+         * 3. PERSISTENT PROGRESS STATE (localStorage: 'yakthung_pan_final_v1')
+         */
+        const STORAGE_KEY = 'yakthung_pan_final_v1';
+
+        let progress = {
+            unlockedLevel: 1,
+            levelStars: {},         // { 1: 3, 2: 2, ... }
+            masteredChars: [],      // up to 45 traceable items: 25 consonants + 9 vowels + 11 numbers
+            xp: 0,
+            streak: 1,
+            lastActiveDate: new Date().toDateString()
+        };
+
+        function loadProgress() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    progress = { ...progress, ...parsed };
+
+                    const today = new Date().toDateString();
+                    if (progress.lastActiveDate !== today) {
+                        const yesterday = new Date(Date.now() - 86400000).toDateString();
+                        progress.streak = (progress.lastActiveDate === yesterday) ? (progress.streak + 1) : 1;
+                        progress.lastActiveDate = today;
+                        saveProgress();
+                    }
+                } else {
+                    saveProgress();
+                }
+            } catch (e) {
+                console.warn('Could not read localStorage:', e);
+            }
+            updateHudDisplay();
+        }
+
+        function saveProgress() {
+            try {
+                progress.lastActiveDate = new Date().toDateString();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+            } catch (e) {
+                console.warn('Could not save localStorage:', e);
+            }
+            updateHudDisplay();
+        }
+
+        function updateHudDisplay() {
+            document.getElementById('hudStreak').textContent = progress.streak;
+            document.getElementById('hudXp').textContent = progress.xp;
+            document.getElementById('hudMastered').textContent = `${progress.masteredChars.length}/45`;
+            const summaryEl = document.getElementById('modalStatsSummary');
+            if (summaryEl) {
+                summaryEl.textContent = `${progress.masteredChars.length}/45 Characters Mastered • ${progress.xp} XP`;
+            }
+        }
+
+        /**
+         * 4. RUNTIME SESSION STATE
+         */
+        let session = {
+            activeLevel: null,
+            activeChartTab: 'consonants',
+            selectedNaukhariConsonantId: 'ka',
+            isSinglePractice: false,
+            stepIdx: 0,
+            ghostMode: false,
+            currentAccuracy: 0,
+            stepPassed: false,
+            stepAccuracies: [],
+            // Boss Quiz state (70% pass gate & smart missed-letter re-queue)
+            quizQuestions: [],
+            quizCorrectCount: 0,
+            quizAnswered: false,
+            quizMissedItems: [],
+            quizRequeuedIds: [],
+            // Saknam / Marks builder state
+            saknamItems: [],
+            saknamCorrectCount: 0,
+            saknamAnswered: false,
+            // Tile builder state
+            tileSelected: [],
+            tileBank: [],
+            tileChecked: false
+        };
+
+        // Canvas & Offscreen Pixel-Mask Buffers
+        let canvas, ctx;
+        let targetMaskCanvas, targetMaskCtx;
+        let userStrokeCanvas, userStrokeCtx;
+        let targetPixelSet = new Uint8Array(0);
+        let totalTargetPixels = 0;
+        let isDrawing = false;
+        let lastX = 0, lastY = 0;
+        let audioCtx = null;
+
+        /**
+         * 5. WEB AUDIO CHIMES & SPEECH SYNTHESIS
+         */
+        function playTone(freq = 330, mode = 'note') {
+            try {
+                if (!audioCtx) {
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    if (AC) audioCtx = new AC();
+                }
+                if (!audioCtx) return;
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const now = audioCtx.currentTime;
+                if (mode === 'note') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now);
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(0.24, now + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.44);
+                } else if (mode === 'success') {
+                    [523.25, 659.25, 783.99].forEach((f, i) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(f, now + i * 0.08);
+                        g.gain.setValueAtTime(0.001, now + i * 0.08);
+                        g.gain.linearRampToValueAtTime(0.18, now + i * 0.08 + 0.02);
+                        g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.3);
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.start(now + i * 0.08);
+                        o.stop(now + i * 0.08 + 0.32);
+                    });
+                } else if (mode === 'error') {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.type = 'sawtooth';
+                    o.frequency.setValueAtTime(165, now);
+                    o.frequency.linearRampToValueAtTime(125, now + 0.22);
+                    g.gain.setValueAtTime(0.14, now);
+                    g.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
+                    o.start(now);
+                    o.stop(now + 0.25);
+                }
+            } catch (e) {
+                console.warn(e);
+            }
+        }
+
+        function speakText(text, lang = 'hi-IN', freq = 380) {
+            playTone(freq, 'note');
+            try {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utter = new SpeechSynthesisUtterance(text);
+                    utter.lang = lang;
+                    utter.rate = 0.85;
+                    window.speechSynthesis.speak(utter);
+                }
+            } catch (e) {}
+        }
+
+        function speakCurrentCharacter() {
+            const letter = getCurrentLetterObj();
+            speakText(letter.devaBase || letter.deva, 'hi-IN', letter.freq);
+        }
+
+        function showToast(msg, icon = '✦') {
+            const banner = document.getElementById('toastBanner');
+            document.getElementById('toastMessage').textContent = msg;
+            document.getElementById('toastIcon').textContent = icon;
+            banner.classList.remove('opacity-0', '-translate-y-2');
+            banner.classList.add('opacity-100', 'translate-y-0');
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                banner.classList.remove('opacity-100', 'translate-y-0');
+                banner.classList.add('opacity-0', '-translate-y-2');
+            }, 2300);
+        }
+
+        /**
+         * 6. CANDY CRUSH-STYLE 17-LEVEL WINDING ADVENTURE MAP RENDERER
+         */
+        function renderWindingMap() {
+            const container = document.getElementById('windingMapContainer');
+            container.innerHTML = '';
+
+            // Bottom-to-top progression (Level 1 at bottom, Level 17 at summit)
+            const reversedLevels = [...ADVENTURE_LEVELS].reverse();
+            const stepHeight = 132;
+            const topPad = 115;
+            const bottomPad = 100;
+            const totalHeight = topPad + (reversedLevels.length - 1) * stepHeight + bottomPad;
+
+            container.style.height = `${totalHeight}px`;
+            container.className = 'relative w-full bg-gradient-to-b from-indigo-100/75 via-parchment-50 to-emerald-100/80';
+
+            const xWave = [50, 74, 48, 25, 52, 75, 48, 25, 50, 74, 48, 25, 52, 74, 48, 26, 50];
+            const coords = reversedLevels.map((lvl, idx) => {
+                const origIdx = lvl.levelNum - 1;
+                return {
+                    lvl,
+                    xPct: xWave[origIdx % xWave.length],
+                    yPx: topPad + idx * stepHeight
+                };
+            });
+
+            // Draw SVG Winding Mountain Trail
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('viewBox', `0 0 100 ${totalHeight}`);
+            svg.setAttribute('preserveAspectRatio', 'none');
+            svg.className = 'absolute inset-0 w-full h-full pointer-events-none z-10';
+
+            let d = '';
+            coords.forEach((c, i) => {
+                if (i === 0) {
+                    d += `M ${c.xPct} ${c.yPx}`;
+                } else {
+                    const prev = coords[i - 1];
+                    const midY = (prev.yPx + c.yPx) / 2;
+                    d += ` C ${prev.xPct} ${midY}, ${c.xPct} ${midY}, ${c.xPct} ${c.yPx}`;
+                }
+            });
+
+            const trailOuter = document.createElementNS(svgNS, 'path');
+            trailOuter.setAttribute('d', d);
+            trailOuter.setAttribute('fill', 'none');
+            trailOuter.setAttribute('stroke', 'rgba(5, 150, 105, 0.24)');
+            trailOuter.setAttribute('stroke-width', '4.4');
+            trailOuter.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(trailOuter);
+
+            const trailDash = document.createElementNS(svgNS, 'path');
+            trailDash.setAttribute('d', d);
+            trailDash.setAttribute('fill', 'none');
+            trailDash.setAttribute('stroke', '#ffffff');
+            trailDash.setAttribute('stroke-width', '1.8');
+            trailDash.setAttribute('stroke-dasharray', '3 3');
+            trailDash.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(trailDash);
+
+            container.appendChild(svg);
+
+            // Render Chapter Banner Headers above each chapter's top-most node
+            const chapterTopNodes = {
+                5: coords.find(c => c.lvl.levelNum === 17),
+                4: coords.find(c => c.lvl.levelNum === 14),
+                3: coords.find(c => c.lvl.levelNum === 10),
+                2: coords.find(c => c.lvl.levelNum === 8),
+                1: coords.find(c => c.lvl.levelNum === 4)
+            };
+
+            Object.entries(chapterTopNodes).forEach(([chapId, nodeCoord]) => {
+                if (!nodeCoord) return;
+                const chap = CHAPTERS.find(ch => ch.id === Number(chapId));
+                const banner = document.createElement('div');
+                banner.className = 'absolute left-1/2 -translate-x-1/2 z-20 w-[88%] max-w-[380px] pointer-events-none';
+                banner.style.top = `${Math.max(12, nodeCoord.yPx - 78)}px`;
+                banner.innerHTML = `
+                    <div class="bg-white/95 backdrop-blur-xs border border-parchment-300 rounded-2xl px-3.5 py-1.5 shadow-sm flex items-center justify-between gap-2">
+                        <div>
+                            <div class="text-[11px] font-extrabold text-slatebrand-900 leading-tight">${chap.title}</div>
+                            <div class="text-[10px] font-semibold text-slate-500">${chap.subtitle}</div>
+                        </div>
+                        <span class="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full ${chap.badgeColor}">
+                            Unit ${chap.id}
+                        </span>
+                    </div>
+                `;
+                container.appendChild(banner);
+            });
+
+            // Render Interactive Level Nodes
+            coords.forEach(({ lvl, xPct, yPx }) => {
+                const isDone = Boolean(progress.levelStars[lvl.levelNum]);
+                const isCurrent = lvl.levelNum === progress.unlockedLevel;
+                const isLocked = lvl.levelNum > progress.unlockedLevel;
+                const stars = progress.levelStars[lvl.levelNum] || 0;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'absolute z-20 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center';
+                wrapper.style.left = `${xPct}%`;
+                wrapper.style.top = `${yPx}px`;
+
+                // Floating PLAY callout on current unlocked node
+                if (isCurrent) {
+                    const badge = document.createElement('div');
+                    badge.className = 'float-play-badge absolute -top-9 left-1/2 bg-slatebrand-900 text-goldaccent-400 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-lg border border-goldaccent-400/60 whitespace-nowrap';
+                    badge.textContent = '▶ PLAY';
+                    wrapper.appendChild(badge);
+
+                    const pulse = document.createElement('div');
+                    pulse.className = 'active-node-ring absolute top-0 w-16 h-16 rounded-full bg-emerald-500/40 pointer-events-none';
+                    wrapper.appendChild(pulse);
+                }
+
+                const btn = document.createElement('button');
+                let btnColors = '';
+                if (isDone) {
+                    btnColors = 'bg-gradient-to-b from-emerald-400 to-emerald-600 border-4 border-white text-white shadow-[0_6px_0_#065f46]';
+                } else if (isCurrent) {
+                    btnColors = 'bg-gradient-to-b from-goldaccent-400 to-amber-600 border-4 border-white text-slatebrand-900 shadow-[0_6px_0_#92400e]';
+                } else {
+                    btnColors = 'bg-gradient-to-b from-slate-200 to-slate-300 border-4 border-slate-100 text-slate-500 shadow-[0_5px_0_#94a3b8]';
+                }
+
+                const sizeClass = lvl.isBoss ? 'w-[74px] h-[74px]' : 'w-[66px] h-[66px]';
+                btn.className = `node-3d relative ${sizeClass} rounded-full flex flex-col items-center justify-center ${btnColors}`;
+
+                if (isLocked) {
+                    btn.innerHTML = `
+                        <span class="text-base">🔒</span>
+                        <span class="text-[10px] font-extrabold leading-none mt-0.5">Lvl ${lvl.levelNum}</span>
+                    `;
+                    btn.onclick = () => {
+                        btn.classList.remove('shake-locked');
+                        void btn.offsetWidth;
+                        btn.classList.add('shake-locked');
+                        playTone(150, 'error');
+                        showToast(`Clear Level ${progress.unlockedLevel} first to unlock!`, '🔒');
+                    };
+                } else {
+                    const iconStyle = (lvl.type === 'trace' || lvl.type === 'saknam') ? 'font-limbu text-2xl' : 'text-2xl';
+                    btn.innerHTML = `
+                        ${isDone ? '<span class="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-goldaccent-400 text-slatebrand-900 border-2 border-white text-xs font-extrabold flex items-center justify-center shadow">✓</span>' : ''}
+                        <span class="${iconStyle} leading-none font-bold">${lvl.icon}</span>
+                        <span class="text-[9px] font-extrabold uppercase mt-0.5">Lvl ${lvl.levelNum}</span>
+                    `;
+                    btn.onclick = () => {
+                        playTone(440, 'note');
+                        startAdventureLevel(lvl);
+                    };
+                }
+
+                wrapper.appendChild(btn);
+
+                // 3-Star Pill underneath node
+                const starRow = document.createElement('div');
+                starRow.className = 'mt-1.5 px-2 py-0.5 rounded-full bg-white/95 border border-black/5 shadow-xs flex items-center gap-0.5 text-[11px]';
+                for (let s = 1; s <= 3; s++) {
+                    const st = document.createElement('span');
+                    st.textContent = '★';
+                    st.className = s <= stars ? 'text-goldaccent-400' : 'text-slate-300';
+                    starRow.appendChild(st);
+                }
+                wrapper.appendChild(starRow);
+
+                // Level Title Tag
+                const lbl = document.createElement('span');
+                lbl.className = `mt-1 text-[10px] font-extrabold px-2 py-0.5 rounded-md whitespace-nowrap ${
+                    isLocked ? 'text-slate-500 bg-white/60' : 'text-slatebrand-900 bg-white/95 shadow-xs'
+                }`;
+                lbl.textContent = lvl.title;
+                wrapper.appendChild(lbl);
+
+                container.appendChild(wrapper);
+            });
+
+            // Auto-scroll smoothly to the user's current active level
+            setTimeout(() => {
+                const mapEl = document.getElementById('mapView');
+                const active = coords.find(c => c.lvl.levelNum === progress.unlockedLevel);
+                if (mapEl && active) {
+                    mapEl.scrollTo({
+                        top: Math.max(0, active.yPx - mapEl.clientHeight / 2),
+                        behavior: 'smooth'
+                    });
+                }
+            }, 60);
+        }
+
+        /**
+         * 7. 5-TAB SIRIJONGA SAK-SAK CHART MODAL
+         */
+        function openChartModal() {
+            document.getElementById('chartModal').classList.remove('hidden');
+            switchChartTab(session.activeChartTab || 'consonants');
+        }
+
+        function closeChartModal() {
+            document.getElementById('chartModal').classList.add('hidden');
+        }
+
+        function switchChartTab(tabName) {
+            session.activeChartTab = tabName;
+            ['consonants', 'vowels', 'naukhari', 'marks', 'numbers'].forEach(t => {
+                const btn = document.getElementById(`chartTab_${t}`);
+                if (!btn) return;
+                if (t === tabName) {
+                    btn.className = 'py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-slatebrand-900 text-goldaccent-400 shadow-xs transition leading-tight';
+                } else {
+                    btn.className = 'py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-white text-slate-700 border border-parchment-300 transition leading-tight';
+                }
+            });
+
+            const body = document.getElementById('chartTabBody');
+            body.innerHTML = '';
+
+            if (tabName === 'consonants') {
+                // Tab 1: Exact 25-Consonant Kudhuku-sak Chart
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-3xl p-3 border border-parchment-300 shadow-sm space-y-2';
+                card.innerHTML = `<div class="text-[11px] font-extrabold text-slatebrand-900 px-1">Kudhuku-sak • 25 Consonants (Tap any letter to trace)</div>`;
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-4 gap-2';
+
+                SIRIJONGA_25.forEach((item, idx) => {
+                    const isMastered = progress.masteredChars.includes(item.id);
+                    const isLastCentered = idx === 24;
+                    const btn = document.createElement('button');
+                    btn.className = `${isLastCentered ? 'col-start-2 col-span-2' : ''} relative rounded-2xl p-2 bg-parchment-50/70 border ${
+                        isMastered ? 'border-emerald-500 bg-emerald-50/60' : 'border-parchment-300'
+                    } hover:border-emerald-600 active:scale-95 shadow-xs flex flex-col items-center justify-center gap-0.5 transition`;
+                    btn.innerHTML = `
+                        ${isMastered ? '<span class="absolute top-1 right-1.5 text-[10px] font-extrabold text-emerald-600">✓</span>' : ''}
+                        <div class="flex items-center justify-center gap-1.5">
+                            <span class="font-limbu text-3xl text-slatebrand-900 leading-none">${item.char}</span>
+                            <div class="flex flex-col items-start leading-tight">
+                                <span class="font-deva text-xs font-bold text-emerald-700">${item.deva}</span>
+                                <span class="text-[10px] font-extrabold text-slate-700">${item.latin}</span>
+                            </div>
+                        </div>
+                        <span class="text-[9px] font-semibold text-slate-500 truncate max-w-full">${item.wordLatin} • ${item.meaning.split('/')[0].trim()}</span>
+                    `;
+                    btn.onclick = () => {
+                        closeChartModal();
+                        speakText(item.devaBase, 'hi-IN', item.freq);
+                        startSingleLetterPractice(item);
+                    };
+                    grid.appendChild(btn);
+                });
+                card.appendChild(grid);
+                body.appendChild(card);
+
+            } else if (tabName === 'vowels') {
+                // Tab 2: Kubung-sak 9 Vowels in exact 3x3 grid
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-3xl p-3.5 border border-parchment-300 shadow-sm space-y-2.5';
+                card.innerHTML = `<div class="text-[11px] font-extrabold text-slatebrand-900 px-1">Kubung-sak • 9 Core Vowels (3×3 Grid • Tap to trace)</div>`;
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-3 gap-2.5';
+
+                KUBUNG_VOWELS_9.forEach(item => {
+                    const isMastered = progress.masteredChars.includes(item.id);
+                    const btn = document.createElement('button');
+                    btn.className = `relative rounded-2xl p-3 bg-parchment-50/70 border ${
+                        isMastered ? 'border-emerald-500 bg-emerald-50/60' : 'border-parchment-300'
+                    } hover:border-emerald-600 active:scale-95 shadow-xs flex flex-col items-center justify-center gap-1 transition`;
+                    btn.innerHTML = `
+                        ${isMastered ? '<span class="absolute top-1.5 right-2 text-[10px] font-extrabold text-emerald-600">✓</span>' : ''}
+                        <span class="font-limbu text-4xl text-slatebrand-900 leading-none">${item.char}</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-deva text-sm font-bold text-emerald-700">${item.deva}</span>
+                            <span class="text-xs font-extrabold text-slate-700">${item.latin}</span>
+                        </div>
+                        <span class="text-[9px] font-semibold text-slate-500">${item.wordLatin} (${item.meaning.split('/')[0].trim()})</span>
+                    `;
+                    btn.onclick = () => {
+                        closeChartModal();
+                        speakText(item.deva, 'hi-IN', item.freq);
+                        startSingleLetterPractice(item);
+                    };
+                    grid.appendChild(btn);
+                });
+                card.appendChild(grid);
+                body.appendChild(card);
+
+            } else if (tabName === 'naukhari') {
+                // Tab 3: Interactive 9-Form Naukhari (Saknam-bhan) Explorer
+                const selectedCons = SIRIJONGA_25.find(c => c.id === session.selectedNaukhariConsonantId) || SIRIJONGA_25[0];
+                const stemLatin = selectedCons.latin.slice(0, -1);
+
+                const explorerCard = document.createElement('div');
+                explorerCard.className = 'bg-white rounded-3xl p-3.5 border border-parchment-300 shadow-sm space-y-3';
+
+                const headerHtml = document.createElement('div');
+                headerHtml.className = 'flex items-center justify-between gap-2';
+                headerHtml.innerHTML = `
+                    <div>
+                        <div class="text-xs font-extrabold text-slatebrand-900">Saknam-bhan (Naukhari 9-Form)</div>
+                        <p class="text-[10px] text-slate-500 font-semibold">Pick a consonant below, then tap any 3×3 syllable to hear it</p>
+                    </div>
+                    <div class="px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-1.5 shrink-0">
+                        <span class="font-limbu text-xl text-emerald-700 font-bold">${selectedCons.char}</span>
+                        <span class="text-xs font-extrabold text-slatebrand-900">${selectedCons.latin}</span>
+                    </div>
+                `;
+                explorerCard.appendChild(headerHtml);
+
+                const pillBar = document.createElement('div');
+                pillBar.className = 'flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1';
+                SIRIJONGA_25.forEach(c => {
+                    const isSelected = c.id === selectedCons.id;
+                    const pill = document.createElement('button');
+                    pill.className = isSelected
+                        ? 'px-2.5 py-1.5 rounded-xl bg-slatebrand-900 text-goldaccent-400 border border-slatebrand-900 shadow-xs flex items-center gap-1 shrink-0 transition'
+                        : 'px-2.5 py-1.5 rounded-xl bg-parchment-50 hover:bg-parchment-100 text-slatebrand-900 border border-parchment-300 flex items-center gap-1 shrink-0 transition';
+                    pill.innerHTML = `
+                        <span class="font-limbu text-base leading-none">${c.char}</span>
+                        <span class="text-[10px] font-extrabold">${c.latin}</span>
+                    `;
+                    pill.onclick = () => {
+                        session.selectedNaukhariConsonantId = c.id;
+                        playTone(c.freq, 'note');
+                        switchChartTab('naukhari');
+                    };
+                    pillBar.appendChild(pill);
+                });
+                explorerCard.appendChild(pillBar);
+
+                const matrixGrid = document.createElement('div');
+                matrixGrid.className = 'grid grid-cols-3 gap-2.5 pt-1';
+
+                NAUKHARI_FORMS.forEach(form => {
+                    const combinedLimbu = `${selectedCons.char}${form.limbuMatra}`;
+                    const combinedDeva = `${selectedCons.devaBase}${form.devaMatra}`;
+                    const combinedLatin = `${stemLatin}${form.latinSuffix}`;
+                    const noteFreq = Math.min(1150, selectedCons.freq + form.toneOffset);
+
+                    const cell = document.createElement('button');
+                    cell.className = 'rounded-2xl p-2.5 bg-parchment-50/80 hover:bg-emerald-50/70 border border-parchment-300 hover:border-emerald-500 active:scale-95 shadow-xs flex flex-col items-center justify-center gap-1 transition';
+                    cell.innerHTML = `
+                        <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400">${form.name}</span>
+                        <span class="font-limbu text-3xl text-slatebrand-900 leading-tight">${combinedLimbu}</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-deva text-xs font-bold text-emerald-700">${combinedDeva}</span>
+                            <span class="text-xs font-extrabold text-slate-800">${combinedLatin}</span>
+                        </div>
+                    `;
+                    cell.onclick = () => {
+                        speakText(combinedDeva, 'hi-IN', noteFreq);
+                    };
+                    matrixGrid.appendChild(cell);
+                });
+
+                explorerCard.appendChild(matrixGrid);
+                body.appendChild(explorerCard);
+
+            } else if (tabName === 'marks') {
+                // Tab 4: Saknam-sak 8 Matras, Chuk-sak Finals, Ektum-sak Conjuncts & Kusek-sak Marks
+                const matraCard = document.createElement('div');
+                matraCard.className = 'bg-white rounded-3xl p-3 border border-parchment-300 shadow-sm space-y-2';
+                matraCard.innerHTML = `<div class="text-[11px] font-extrabold text-slatebrand-900">Saknam-sak • 8 Vowel Matras (Tap to Hear)</div>`;
+                const matraGrid = document.createElement('div');
+                matraGrid.className = 'grid grid-cols-2 gap-2';
+                SAKNAM_MATRAS.forEach(m => {
+                    const b = document.createElement('button');
+                    b.className = 'p-2.5 rounded-2xl bg-parchment-50/70 border border-parchment-200 hover:border-emerald-500 flex items-center justify-between text-left active:scale-95 transition';
+                    b.innerHTML = `
+                        <div>
+                            <div class="text-xs font-extrabold text-slatebrand-900">${m.name}</div>
+                            <div class="font-deva text-[10px] text-slate-500">${m.nepali}</div>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-limbu text-2xl text-emerald-700 font-bold">${m.demo}</span>
+                            <span class="block text-[10px] font-bold text-slate-600">${m.latin}</span>
+                        </div>
+                    `;
+                    b.onclick = () => speakText(m.deva, 'hi-IN', 420);
+                    matraGrid.appendChild(b);
+                });
+                matraCard.appendChild(matraGrid);
+                body.appendChild(matraCard);
+
+                const chukCard = document.createElement('div');
+                chukCard.className = 'bg-white rounded-3xl p-3 border border-parchment-300 shadow-sm space-y-2';
+                chukCard.innerHTML = `<div class="text-[11px] font-extrabold text-slatebrand-900">Chuk-sak • 7 Half / Subjoined Final Consonants</div>`;
+                const chukGrid = document.createElement('div');
+                chukGrid.className = 'grid grid-cols-4 gap-1.5';
+                CHUK_FINALS.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'p-2 rounded-xl bg-parchment-50/70 border border-parchment-200 text-center';
+                    div.innerHTML = `
+                        <div class="font-limbu text-xl text-slatebrand-900">${c.demo}</div>
+                        <div class="font-deva text-[10px] font-bold text-emerald-700">${c.sound}</div>
+                    `;
+                    chukGrid.appendChild(div);
+                });
+                chukCard.appendChild(chukGrid);
+                body.appendChild(chukCard);
+
+                const ekCard = document.createElement('div');
+                ekCard.className = 'bg-white rounded-3xl p-3 border border-parchment-300 shadow-sm space-y-2';
+                ekCard.innerHTML = `<div class="text-[11px] font-extrabold text-slatebrand-900">Ektum-sak (Conjuncts) & Kusek-sak (Sound Marks)</div>`;
+                const list = document.createElement('div');
+                list.className = 'space-y-1.5';
+                [...EKTUM_CONJUNCTS, ...KUSEK_MARKS].forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'p-2.5 rounded-xl bg-parchment-50/70 border border-parchment-200 flex items-center justify-between';
+                    row.innerHTML = `
+                        <div>
+                            <div class="text-xs font-extrabold text-slatebrand-900">${item.name}</div>
+                            <div class="text-[10px] text-slate-600">${item.meaning}</div>
+                        </div>
+                        <span class="font-limbu text-xl text-emerald-700 font-bold">${item.demo}</span>
+                    `;
+                    list.appendChild(row);
+                });
+                ekCard.appendChild(list);
+                body.appendChild(ekCard);
+
+            } else if (tabName === 'numbers') {
+                // Tab 5: Khanin Limbu Numerals 0–10
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-3xl p-3.5 border border-parchment-300 shadow-sm space-y-2.5';
+                card.innerHTML = `<div class="text-[11px] font-extrabold text-slatebrand-900 px-1">Khanin • Limbu Numerals 0–10 (Tap any digit to trace)</div>`;
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-3 gap-2.5';
+
+                KHANIN_NUMBERS.forEach(item => {
+                    const isMastered = progress.masteredChars.includes(item.id);
+                    const btn = document.createElement('button');
+                    btn.className = `relative rounded-2xl p-3 bg-parchment-50/70 border ${
+                        isMastered ? 'border-emerald-500 bg-emerald-50/60' : 'border-parchment-300'
+                    } hover:border-emerald-600 active:scale-95 shadow-xs flex flex-col items-center justify-center gap-1 transition`;
+                    btn.innerHTML = `
+                        ${isMastered ? '<span class="absolute top-1.5 right-2 text-[10px] font-extrabold text-emerald-600">✓</span>' : ''}
+                        <span class="font-limbu text-3xl text-slatebrand-900 leading-none">${item.char}</span>
+                        <span class="text-xs font-extrabold text-emerald-700">${item.latin}</span>
+                        <span class="font-limbu text-xs text-slate-500">${item.wordLimbu} (${item.wordLatin})</span>
+                    `;
+                    btn.onclick = () => {
+                        closeChartModal();
+                        speakText(item.wordLatin, 'en-US', item.freq);
+                        startSingleLetterPractice(item);
+                    };
+                    grid.appendChild(btn);
+                });
+                card.appendChild(grid);
+                body.appendChild(card);
+            }
+        }
+
+        /**
+         * 8. LESSON ROUTER (TRACE, BOSS QUIZ, SAKNAM BUILDER, VILLAGE TILES)
+         */
+        function hideAllLessonWorkspaces() {
+            document.getElementById('tracingWorkspace').classList.add('hidden');
+            document.getElementById('quizWorkspace').classList.add('hidden');
+            document.getElementById('retryWorkspace').classList.add('hidden');
+            document.getElementById('tileWorkspace').classList.add('hidden');
+            document.getElementById('saknamWorkspace').classList.add('hidden');
+            document.getElementById('victoryWorkspace').classList.add('hidden');
+        }
+
+        function closeLessonModal() {
+            document.getElementById('lessonModal').classList.add('hidden');
+            renderWindingMap();
+        }
+
+        function startAdventureLevel(lvl) {
+            session.activeLevel = lvl;
+            session.isSinglePractice = false;
+            session.stepIdx = 0;
+            session.stepAccuracies = [];
+
+            document.getElementById('lessonModal').classList.remove('hidden');
+            hideAllLessonWorkspaces();
+
+            if (lvl.type === 'trace') {
+                document.getElementById('tracingWorkspace').classList.remove('hidden');
+                loadCurrentTraceCard();
+            } else if (lvl.type === 'quiz') {
+                document.getElementById('quizWorkspace').classList.remove('hidden');
+                initBossQuiz(lvl);
+            } else if (lvl.type === 'saknam') {
+                document.getElementById('saknamWorkspace').classList.remove('hidden');
+                initSaknamBuilder(lvl);
+            } else if (lvl.type === 'tiles') {
+                document.getElementById('tileWorkspace').classList.remove('hidden');
+                initVillageTiles();
+            }
+        }
+
+        function startSingleLetterPractice(item) {
+            session.activeLevel = {
+                type: 'trace',
+                title: `${item.latin} (${item.deva}) Practice`,
+                singleItem: item
+            };
+            session.isSinglePractice = true;
+            session.stepIdx = 0;
+            session.stepAccuracies = [];
+
+            document.getElementById('lessonModal').classList.remove('hidden');
+            hideAllLessonWorkspaces();
+            document.getElementById('tracingWorkspace').classList.remove('hidden');
+            loadCurrentTraceCard();
+        }
+
+        /**
+         * 9. MODE A: TUNED FINGER-TRACING PAD
+         */
+        function getLetterById(id) {
+            return ALL_TRACEABLE_ITEMS.find(item => item.id === id) || SIRIJONGA_25[0];
+        }
+
+        function getCurrentLetterObj() {
+            if (session.isSinglePractice) return session.activeLevel.singleItem;
+            const id = session.activeLevel.letterIds[session.stepIdx];
+            return getLetterById(id);
+        }
+
+        function loadCurrentTraceCard() {
+            const total = session.isSinglePractice ? 1 : session.activeLevel.letterIds.length;
+            const letter = getCurrentLetterObj();
+
+            document.getElementById('lessonHeaderTitle').textContent = session.isSinglePractice
+                ? session.activeLevel.title
+                : `Level ${session.activeLevel.levelNum} • ${session.activeLevel.title}`;
+            document.getElementById('lessonStepCounter').textContent = `${session.stepIdx + 1} / ${total}`;
+            document.getElementById('lessonProgressBar').style.width = `${Math.round(((session.stepIdx + 1) / total) * 100)}%`;
+
+            document.getElementById('cardLimbuGlyph').textContent = letter.char;
+            document.getElementById('cardLatinSound').textContent = letter.latin;
+            document.getElementById('cardDevaSound').textContent = letter.deva;
+            document.getElementById('cardPhoneticHint').textContent = `Row ${letter.row} • ${letter.category || 'Consonant'}`;
+
+            document.getElementById('cardPictureEmoji').textContent = letter.emoji;
+            document.getElementById('cardAnchorLimbu').textContent = letter.wordLimbu;
+            document.getElementById('cardAnchorLatin').textContent = letter.wordLatin;
+            document.getElementById('cardAnchorMeaning').textContent = letter.meaning;
+
+            setTimeout(() => {
+                initTracingBuffers();
+            }, 25);
+        }
+
+        function toggleGhostMode() {
+            session.ghostMode = !session.ghostMode;
+            const btn = document.getElementById('ghostToggleBtn');
+            const txt = document.getElementById('ghostText');
+            const ico = document.getElementById('ghostIcon');
+
+            if (session.ghostMode) {
+                btn.className = 'text-[11px] font-bold px-2.5 py-1 rounded-xl border bg-slatebrand-900 border-slatebrand-900 text-goldaccent-400 flex items-center gap-1 transition';
+                txt.textContent = 'Ghost: On';
+                ico.textContent = '👻';
+            } else {
+                btn.className = 'text-[11px] font-bold px-2.5 py-1 rounded-xl border bg-parchment-50 border-parchment-300 text-slatebrand-800 flex items-center gap-1 transition';
+                txt.textContent = 'Ghost: Off';
+                ico.textContent = '👁️';
+            }
+            resetTracingCanvas();
+        }
+
+        function setupCanvasEvents() {
+            canvas = document.getElementById('tracingCanvas');
+            ctx = canvas.getContext('2d');
+
+            targetMaskCanvas = document.createElement('canvas');
+            targetMaskCtx = targetMaskCanvas.getContext('2d', { willReadFrequently: true });
+
+            userStrokeCanvas = document.createElement('canvas');
+            userStrokeCtx = userStrokeCanvas.getContext('2d', { willReadFrequently: true });
+
+            canvas.addEventListener('mousedown', onPointerDown);
+            canvas.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('mouseup', onPointerUp);
+
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                onPointerDown(e.touches[0]);
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                onPointerMove(e.touches[0]);
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', onPointerUp);
+        }
+
+        function initTracingBuffers() {
+            const box = document.getElementById('canvasBox');
+            if (!box || !canvas) return;
+
+            const rect = box.getBoundingClientRect();
+            const w = Math.max(280, Math.floor(rect.width));
+            const h = Math.max(360, Math.floor(rect.height));
+
+            canvas.width = w;
+            canvas.height = h;
+            targetMaskCanvas.width = w;
+            targetMaskCanvas.height = h;
+            userStrokeCanvas.width = w;
+            userStrokeCanvas.height = h;
+
+            buildTargetGlyphMask(w, h);
+            resetTracingCanvas();
+        }
+
+        function buildTargetGlyphMask(w, h) {
+            const letter = getCurrentLetterObj();
+            const fontSize = Math.min(w * 0.72, h * 0.76, 265);
+
+            targetMaskCtx.clearRect(0, 0, w, h);
+            targetMaskCtx.save();
+            targetMaskCtx.font = `${fontSize}px "Noto Sans Limbu", sans-serif`;
+            targetMaskCtx.textAlign = 'center';
+            targetMaskCtx.textBaseline = 'middle';
+
+            // Tight 14px hit-zone mask with shadowBlur = 4
+            targetMaskCtx.lineJoin = 'round';
+            targetMaskCtx.lineCap = 'round';
+            targetMaskCtx.lineWidth = 14;
+            targetMaskCtx.shadowColor = '#000000';
+            targetMaskCtx.shadowBlur = 4;
+            targetMaskCtx.strokeStyle = '#000000';
+            targetMaskCtx.fillStyle = '#000000';
+
+            targetMaskCtx.strokeText(letter.char, w / 2, h / 2 + 10);
+            targetMaskCtx.fillText(letter.char, w / 2, h / 2 + 10);
+            targetMaskCtx.restore();
+
+            const imgData = targetMaskCtx.getImageData(0, 0, w, h).data;
+            const totalSamples = Math.ceil((w * h) / 4);
+            targetPixelSet = new Uint8Array(totalSamples);
+            let count = 0;
+            let sampleIdx = 0;
+
+            for (let y = 0; y < h; y += 2) {
+                for (let x = 0; x < w; x += 2) {
+                    const alpha = imgData[(y * w + x) * 4 + 3];
+                    if (alpha > 25) {
+                        targetPixelSet[sampleIdx] = 1;
+                        count++;
+                    }
+                    sampleIdx++;
+                }
+            }
+            totalTargetPixels = Math.max(1, count);
+        }
+
+        function drawVisualGuide(w, h) {
+            const letter = getCurrentLetterObj();
+            const fontSize = Math.min(w * 0.72, h * 0.76, 265);
+
+            ctx.clearRect(0, 0, w, h);
+
+            ctx.save();
+            ctx.strokeStyle = '#ece3d0';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(18, h * 0.16);
+            ctx.lineTo(w - 18, h * 0.16);
+            ctx.moveTo(18, h * 0.84);
+            ctx.lineTo(w - 18, h * 0.84);
+            ctx.stroke();
+
+            ctx.setLineDash([6, 6]);
+            ctx.strokeStyle = '#dfd0b3';
+            ctx.beginPath();
+            ctx.moveTo(18, h * 0.5);
+            ctx.lineTo(w - 18, h * 0.5);
+            ctx.stroke();
+            ctx.restore();
+
+            // Sleek dashed outline (lineWidth = 1.5, [4, 4] dash, subtle 0.09 fill opacity)
+            ctx.save();
+            ctx.font = `${fontSize}px "Noto Sans Limbu", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (session.ghostMode) {
+                ctx.fillStyle = 'rgba(200, 75, 49, 0.04)';
+                ctx.fillText(letter.char, w / 2, h / 2 + 10);
+            } else {
+                ctx.fillStyle = 'rgba(200, 75, 49, 0.09)';
+                ctx.fillText(letter.char, w / 2, h / 2 + 10);
+                ctx.setLineDash([4, 4]);
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = 'rgba(200, 75, 49, 0.45)';
+                ctx.strokeText(letter.char, w / 2, h / 2 + 10);
+            }
+            ctx.restore();
+        }
+
+        function resetTracingCanvas() {
+            session.currentAccuracy = 0;
+            session.stepPassed = false;
+
+            if (userStrokeCanvas) {
+                userStrokeCtx.clearRect(0, 0, userStrokeCanvas.width, userStrokeCanvas.height);
+            }
+            if (canvas) {
+                drawVisualGuide(canvas.width, canvas.height);
+            }
+            updateAccuracyUI(0, false);
+        }
+
+        function getPointerXY(ev) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (ev.clientX - rect.left) * (canvas.width / rect.width),
+                y: (ev.clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function onPointerDown(ev) {
+            isDrawing = true;
+            const pt = getPointerXY(ev);
+            lastX = pt.x;
+            lastY = pt.y;
+        }
+
+        function onPointerMove(ev) {
+            if (!isDrawing) return;
+            const pt = getPointerXY(ev);
+
+            const sx = Math.min(canvas.width - 1, Math.max(0, Math.round(pt.x)));
+            const sy = Math.min(canvas.height - 1, Math.max(0, Math.round(pt.y)));
+            const isNearLetter = targetMaskCtx.getImageData(sx, sy, 1, 1).data[3] > 20;
+
+            // 16px crisp black pen ink (#0f172a) on-target, rose (#f43f5e) stray warning
+            ctx.save();
+            ctx.strokeStyle = isNearLetter ? '#0f172a' : '#f43f5e';
+            ctx.lineWidth = 16;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(pt.x, pt.y);
+            ctx.stroke();
+            ctx.restore();
+
+            userStrokeCtx.save();
+            userStrokeCtx.strokeStyle = '#000000';
+            userStrokeCtx.lineWidth = 16;
+            userStrokeCtx.lineCap = 'round';
+            userStrokeCtx.lineJoin = 'round';
+            userStrokeCtx.beginPath();
+            userStrokeCtx.moveTo(lastX, lastY);
+            userStrokeCtx.lineTo(pt.x, pt.y);
+            userStrokeCtx.stroke();
+            userStrokeCtx.restore();
+
+            lastX = pt.x;
+            lastY = pt.y;
+        }
+
+        function onPointerUp() {
+            if (!isDrawing) return;
+            isDrawing = false;
+            evaluateShapeSimilarity();
+        }
+
+        function evaluateShapeSimilarity() {
+            const w = userStrokeCanvas.width;
+            const h = userStrokeCanvas.height;
+            const userData = userStrokeCtx.getImageData(0, 0, w, h).data;
+
+            let matchedTargetPixels = 0;
+            let strayUserPixels = 0;
+            let totalUserPixels = 0;
+            let sampleIdx = 0;
+
+            for (let y = 0; y < h; y += 2) {
+                for (let x = 0; x < w; x += 2) {
+                    const userAlpha = userData[(y * w + x) * 4 + 3];
+                    const isUserInk = userAlpha > 30;
+                    const isTarget = targetPixelSet[sampleIdx] === 1;
+
+                    if (isUserInk) {
+                        totalUserPixels++;
+                        if (isTarget) matchedTargetPixels++;
+                        else strayUserPixels++;
+                    }
+                    sampleIdx++;
+                }
+            }
+
+            if (totalUserPixels < 8) {
+                updateAccuracyUI(0, false);
+                return;
+            }
+
+            const rawCoverage = matchedTargetPixels / totalTargetPixels;
+            const boostedCoverage = Math.min(1, Math.pow(rawCoverage, 0.72));
+            const strayRatio = strayUserPixels / totalUserPixels;
+
+            const strayPenalty = strayRatio > 0.25 ? (strayRatio - 0.25) * 1.4 : 0;
+            let score = Math.round(Math.max(0, Math.min(100, (boostedCoverage - strayPenalty) * 100)));
+
+            if (strayRatio > 0.55) {
+                score = Math.min(score, 32);
+            }
+
+            session.currentAccuracy = score;
+            const passed = score >= 60 && strayRatio <= 0.50;
+            session.stepPassed = passed;
+
+            updateAccuracyUI(score, passed, strayRatio > 0.50);
+        }
+
+        function updateAccuracyUI(score, passed, tooMessy = false) {
+            const badge = document.getElementById('accuracyBadge');
+            const bar = document.getElementById('matchMeterBar');
+            const txt = document.getElementById('matchMeterText');
+            const nextBtn = document.getElementById('nextLetterBtn');
+            const nextLbl = document.getElementById('nextLetterLabel');
+
+            bar.style.width = `${score}%`;
+            txt.textContent = `${score}%`;
+
+            if (passed) {
+                badge.textContent = `Great Match: ${score}% ✓`;
+                badge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
+                bar.className = 'h-full bg-emerald-500 transition-all duration-150';
+
+                const total = session.isSinglePractice ? 1 : session.activeLevel.letterIds.length;
+                const isLast = session.stepIdx >= total - 1;
+
+                nextBtn.disabled = false;
+                nextBtn.className = 'flex-1 py-3 px-4 rounded-xl font-extrabold text-xs bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow transition-all flex items-center justify-center gap-1.5';
+                nextLbl.textContent = session.isSinglePractice
+                    ? 'Done Practicing'
+                    : (isLast ? 'Complete Level' : 'Next Letter');
+            } else {
+                badge.textContent = tooMessy
+                    ? `Off-Target (${score}%) • Stay on Lines`
+                    : `Accuracy: ${score}% (Goal: 60%)`;
+                badge.className = tooMessy
+                    ? 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800'
+                    : 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800';
+                bar.className = tooMessy
+                    ? 'h-full bg-rose-500 transition-all duration-150'
+                    : 'h-full bg-goldaccent-400 transition-all duration-150';
+
+                nextBtn.disabled = true;
+                nextBtn.className = 'flex-1 py-3 px-4 rounded-xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition-all flex items-center justify-center gap-1.5';
+                nextLbl.textContent = 'Trace 60% to Unlock';
+            }
+        }
+
+        function advanceTraceStep() {
+            if (!session.stepPassed) return;
+
+            const currentLetter = getCurrentLetterObj();
+            if (!progress.masteredChars.includes(currentLetter.id)) {
+                progress.masteredChars.push(currentLetter.id);
+            }
+            session.stepAccuracies.push(session.currentAccuracy);
+            saveProgress();
+
+            if (session.isSinglePractice) {
+                playTone(523.25, 'success');
+                showToast(`Practiced ${currentLetter.latin} (${currentLetter.char})!`, '✓');
+                closeLessonModal();
+                return;
+            }
+
+            const total = session.activeLevel.letterIds.length;
+            if (session.stepIdx < total - 1) {
+                playTone(587.33, 'note');
+                session.stepIdx++;
+                loadCurrentTraceCard();
+            } else {
+                const avgAcc = session.stepAccuracies.reduce((a, b) => a + b, 0) / Math.max(1, session.stepAccuracies.length);
+                const stars = avgAcc >= 85 ? 3 : (avgAcc >= 72 ? 2 : 1);
+                completeLevelWithStars(stars, 40, `Average tracing accuracy: ${Math.round(avgAcc)}%`);
+            }
+        }
+
+        /**
+         * 10. MODE B: BOSS RECOGNITION QUIZZES (LEVELS 4, 8, 9 & 10 WITH 70% PASS GATE)
+         */
+        function buildQuizQuestionForTarget(target, pool) {
+            const distractors = pool
+                .filter(item => item.id !== target.id)
+                .sort(() => Math.random() - 0.5)
+                .slice(0, 3);
+            const options = [target, ...distractors].sort(() => Math.random() - 0.5);
+            return { target, options };
+        }
+
+        function initBossQuiz(lvl) {
+            const pool = lvl.poolIds.map(id => getLetterById(id));
+            const count = lvl.questionCount || 8;
+            const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(count, pool.length));
+
+            session.quizQuestions = shuffled.map(target => buildQuizQuestionForTarget(target, pool));
+            session.stepIdx = 0;
+            session.quizCorrectCount = 0;
+            session.quizMissedItems = [];
+            session.quizRequeuedIds = [];
+            renderQuizQuestion();
+        }
+
+        function updateQuizPassMeter() {
+            const total = session.quizQuestions.length;
+            const pct = total > 0 ? Math.round((session.quizCorrectCount / total) * 100) : 0;
+            const threshold = session.activeLevel.passThreshold || 70;
+
+            document.getElementById('quizScoreTag').textContent = `${session.quizCorrectCount}/${total} (${pct}%)`;
+            document.getElementById('quizAccuracyLabel').textContent = `Current Score: ${pct}%`;
+
+            const fillBar = document.getElementById('quizPassFillBar');
+            fillBar.style.width = `${pct}%`;
+            fillBar.className = pct >= threshold
+                ? 'h-full bg-emerald-500 transition-all duration-300'
+                : 'h-full bg-amber-400 transition-all duration-300';
+        }
+
+        function renderQuizQuestion() {
+            const lvl = session.activeLevel;
+            const total = session.quizQuestions.length;
+            const q = session.quizQuestions[session.stepIdx];
+            const isReverse = lvl.quizMode === 'reverse';
+            session.quizAnswered = false;
+
+            document.getElementById('lessonHeaderTitle').textContent = `Level ${lvl.levelNum} • ${lvl.title}`;
+            document.getElementById('lessonStepCounter').textContent = `${session.stepIdx + 1} / ${total}`;
+            document.getElementById('lessonProgressBar').style.width = `${Math.round(((session.stepIdx + 1) / total) * 100)}%`;
+            document.getElementById('quizBossBadge').textContent = isReverse
+                ? `🔥 Reverse Boss • ${lvl.passThreshold || 70}% Goal`
+                : `👑 Boss Quiz • ${lvl.passThreshold || 70}% Goal`;
+
+            updateQuizPassMeter();
+
+            const bigGlyphEl = document.getElementById('quizBigGlyph');
+            const revDevaEl = document.getElementById('quizReverseDeva');
+            const revHintEl = document.getElementById('quizReverseHint');
+            const promptSubEl = document.getElementById('quizPromptSub');
+
+            if (isReverse) {
+                promptSubEl.textContent = 'Select the matching Sirijonga character for:';
+                bigGlyphEl.classList.add('hidden');
+                revDevaEl.classList.remove('hidden');
+                revHintEl.classList.remove('hidden');
+                revDevaEl.textContent = `${q.target.latin} (${q.target.deva})`;
+                revHintEl.textContent = `${q.target.emoji} As in "${q.target.wordLatin}" (${q.target.meaning.split('/')[0].trim()})`;
+            } else {
+                promptSubEl.textContent = 'Identify this Sirijonga character:';
+                bigGlyphEl.classList.remove('hidden');
+                revDevaEl.classList.add('hidden');
+                revHintEl.classList.add('hidden');
+                bigGlyphEl.textContent = q.target.char;
+            }
+
+            document.getElementById('quizFeedbackBox').classList.add('hidden');
+
+            const nextBtn = document.getElementById('quizNextBtn');
+            nextBtn.disabled = true;
+            nextBtn.className = 'w-full py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition';
+            nextBtn.textContent = 'Select an Answer';
+
+            const grid = document.getElementById('quizOptionsGrid');
+            grid.innerHTML = '';
+
+            q.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.dataset.optId = opt.id;
+                btn.className = 'p-3.5 rounded-2xl bg-white hover:bg-parchment-50 border-2 border-parchment-300 text-center shadow-xs active:scale-95 transition flex flex-col items-center justify-center gap-0.5';
+                if (isReverse) {
+                    btn.innerHTML = `
+                        <span class="font-limbu text-4xl text-slatebrand-900 leading-tight py-1">${opt.char}</span>
+                    `;
+                } else {
+                    btn.innerHTML = `
+                        <span class="text-lg font-extrabold text-slatebrand-900">${opt.latin}</span>
+                        <span class="font-deva text-sm font-bold text-emerald-700">${opt.deva}</span>
+                        <span class="text-[10px] text-slate-500 font-semibold">${opt.wordLatin}</span>
+                    `;
+                }
+                btn.onclick = () => selectQuizOption(btn, opt.id === q.target.id, q.target);
+                grid.appendChild(btn);
+            });
+        }
+
+        function playQuizPromptAudio() {
+            const q = session.quizQuestions[session.stepIdx];
+            if (q) speakText(q.target.devaBase, 'hi-IN', q.target.freq);
+        }
+
+        function selectQuizOption(clickedBtn, isCorrect, target) {
+            if (session.quizAnswered) return;
+            session.quizAnswered = true;
+
+            const allBtns = document.querySelectorAll('#quizOptionsGrid button');
+            allBtns.forEach(b => {
+                b.disabled = true;
+                if (b.dataset.optId === target.id) {
+                    b.classList.remove('border-parchment-300', 'bg-white');
+                    b.classList.add('border-emerald-500', 'bg-emerald-50');
+                }
+            });
+
+            const fb = document.getElementById('quizFeedbackBox');
+            fb.classList.remove('hidden');
+
+            if (isCorrect) {
+                session.quizCorrectCount++;
+                playTone(523.25, 'success');
+                fb.className = 'p-3 rounded-2xl text-xs font-bold text-center bg-emerald-100 text-emerald-900 border border-emerald-300';
+                fb.textContent = `✓ Correct! ${target.char} is ${target.latin} (${target.deva}) — as in ${target.wordLatin}.`;
+            } else {
+                playTone(165, 'error');
+                clickedBtn.classList.remove('border-parchment-300', 'bg-white');
+                clickedBtn.classList.add('border-rose-500', 'bg-rose-50');
+
+                if (!session.quizMissedItems.some(m => m.id === target.id)) {
+                    session.quizMissedItems.push(target);
+                }
+
+                // Dynamically re-queue missed letter once during the round
+                if (!session.quizRequeuedIds.includes(target.id) && session.quizRequeuedIds.length < 2) {
+                    session.quizRequeuedIds.push(target.id);
+                    const pool = session.activeLevel.poolIds.map(id => getLetterById(id));
+                    session.quizQuestions.push(buildQuizQuestionForTarget(target, pool));
+                    document.getElementById('lessonStepCounter').textContent = `${session.stepIdx + 1} / ${session.quizQuestions.length}`;
+                }
+
+                fb.className = 'p-3 rounded-2xl text-xs font-bold text-center bg-rose-100 text-rose-900 border border-rose-300';
+                fb.textContent = `✗ Not quite! ${target.char} is ${target.latin} (${target.deva}). We'll review it again!`;
+            }
+
+            updateQuizPassMeter();
+
+            const nextBtn = document.getElementById('quizNextBtn');
+            nextBtn.disabled = false;
+            nextBtn.className = 'w-full py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow transition active:scale-95';
+            nextBtn.textContent = (session.stepIdx < session.quizQuestions.length - 1) ? 'Next Question →' : 'See Boss Quiz Results →';
+        }
+
+        function advanceQuizStep() {
+            if (!session.quizAnswered) return;
+            if (session.stepIdx < session.quizQuestions.length - 1) {
+                session.stepIdx++;
+                renderQuizQuestion();
+            } else {
+                const lvl = session.activeLevel;
+                const total = session.quizQuestions.length;
+                const score = session.quizCorrectCount;
+                const pct = Math.round((score / total) * 100);
+                const threshold = lvl.passThreshold || 70;
+
+                if (pct >= threshold) {
+                    const stars = pct >= 90 ? 3 : (pct >= 80 ? 2 : 1);
+                    completeLevelWithStars(stars, lvl.xpReward || 60, `Boss Score: ${score}/${total} (${pct}%) — Passed 70% Goal!`);
+                } else {
+                    showBossQuizRetry(score, total, pct, threshold);
+                }
+            }
+        }
+
+        function showBossQuizRetry(score, total, pct, threshold) {
+            playTone(165, 'error');
+            hideAllLessonWorkspaces();
+            document.getElementById('retryWorkspace').classList.remove('hidden');
+
+            document.getElementById('retryScorePct').textContent = `${pct}%`;
+            document.getElementById('retrySubText').textContent = `You got ${score} out of ${total} (${pct}%). You need at least ${threshold}% to pass ${session.activeLevel.title} and unlock Level ${session.activeLevel.levelNum + 1}.`;
+
+            const missedBox = document.getElementById('retryMissedBox');
+            const missedChips = document.getElementById('retryMissedChips');
+            missedChips.innerHTML = '';
+
+            if (session.quizMissedItems.length > 0) {
+                missedBox.classList.remove('hidden');
+                session.quizMissedItems.forEach(item => {
+                    const chip = document.createElement('button');
+                    chip.className = 'px-2.5 py-1 rounded-xl bg-parchment-50 border border-parchment-300 flex items-center gap-1.5 text-xs font-bold active:scale-95';
+                    chip.innerHTML = `
+                        <span class="font-limbu text-lg text-slatebrand-900">${item.char}</span>
+                        <span class="text-emerald-700">${item.latin}</span>
+                        <span class="font-deva text-[11px] text-slate-500">(${item.deva})</span>
+                    `;
+                    chip.onclick = () => speakText(item.devaBase, 'hi-IN', item.freq);
+                    missedChips.appendChild(chip);
+                });
+            } else {
+                missedBox.classList.add('hidden');
+            }
+        }
+
+        function retryCurrentBossQuiz() {
+            hideAllLessonWorkspaces();
+            document.getElementById('quizWorkspace').classList.remove('hidden');
+            initBossQuiz(session.activeLevel);
+        }
+
+        /**
+         * 11. MODE D: SAKNAM-BHAN (NAUKHARI) & CHUK-SAK / KUSEK-SAK BUILDER (LEVELS 13 & 14)
+         */
+        function initSaknamBuilder(lvl) {
+            session.saknamItems = lvl.items;
+            session.stepIdx = 0;
+            session.saknamCorrectCount = 0;
+            renderSaknamStep();
+        }
+
+        function renderSaknamStep() {
+            const total = session.saknamItems.length;
+            const item = session.saknamItems[session.stepIdx];
+            session.saknamAnswered = false;
+
+            document.getElementById('lessonHeaderTitle').textContent = `Level ${session.activeLevel.levelNum} • ${session.activeLevel.title}`;
+            document.getElementById('lessonStepCounter').textContent = `${session.stepIdx + 1} / ${total}`;
+            document.getElementById('lessonProgressBar').style.width = `${Math.round(((session.stepIdx + 1) / total) * 100)}%`;
+
+            document.getElementById('saknamBadge').textContent = item.badge;
+            document.getElementById('saknamInstruction').textContent = item.instruction;
+            document.getElementById('saknamTargetDeva').textContent = item.targetDeva;
+            document.getElementById('saknamTargetLatin').textContent = item.targetLatin;
+            document.getElementById('saknamRuleTitle').textContent = item.ruleTitle;
+            document.getElementById('saknamRuleDesc').textContent = item.ruleDesc;
+            document.getElementById('saknamFeedbackBox').classList.add('hidden');
+
+            const nextBtn = document.getElementById('saknamNextBtn');
+            nextBtn.disabled = true;
+            nextBtn.className = 'w-full py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition';
+            nextBtn.textContent = 'Select the Matching Form';
+
+            const grid = document.getElementById('saknamOptionsGrid');
+            grid.innerHTML = '';
+
+            item.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'p-3.5 rounded-2xl bg-white hover:bg-parchment-50 border-2 border-parchment-300 text-center shadow-xs active:scale-95 transition flex flex-col items-center gap-1';
+                btn.innerHTML = `
+                    <span class="font-limbu text-3xl text-slatebrand-900 leading-none">${opt.limbu}</span>
+                    <span class="text-[11px] font-extrabold text-emerald-700">${opt.label}</span>
+                `;
+                btn.onclick = () => selectSaknamOption(btn, opt.limbu === item.answer, item);
+                grid.appendChild(btn);
+            });
+        }
+
+        function playCurrentSaknamAudio() {
+            const item = session.saknamItems[session.stepIdx];
+            if (item) speakText(item.targetDeva, 'hi-IN', 440);
+        }
+
+        function selectSaknamOption(clickedBtn, isCorrect, item) {
+            if (session.saknamAnswered) return;
+            session.saknamAnswered = true;
+
+            const allBtns = document.querySelectorAll('#saknamOptionsGrid button');
+            allBtns.forEach(b => {
+                b.disabled = true;
+                if (b.querySelector('.font-limbu').textContent === item.answer) {
+                    b.classList.remove('border-parchment-300', 'bg-white');
+                    b.classList.add('border-emerald-500', 'bg-emerald-50');
+                }
+            });
+
+            const fb = document.getElementById('saknamFeedbackBox');
+            fb.classList.remove('hidden');
+
+            if (isCorrect) {
+                session.saknamCorrectCount++;
+                playTone(523.25, 'success');
+                fb.className = 'p-3 rounded-2xl text-xs font-bold text-center bg-emerald-100 text-emerald-900 border border-emerald-300';
+                fb.textContent = `✓ Exact Match! "${item.answer}" (${item.targetLatin}) is right.`;
+            } else {
+                playTone(165, 'error');
+                clickedBtn.classList.remove('border-parchment-300', 'bg-white');
+                clickedBtn.classList.add('border-rose-500', 'bg-rose-50');
+                fb.className = 'p-3 rounded-2xl text-xs font-bold text-center bg-rose-100 text-rose-900 border border-rose-300';
+                fb.textContent = `✗ Correct form is "${item.answer}" (${item.ruleTitle}).`;
+            }
+
+            const nextBtn = document.getElementById('saknamNextBtn');
+            nextBtn.disabled = false;
+            nextBtn.className = 'w-full py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow transition active:scale-95';
+            nextBtn.textContent = (session.stepIdx < session.saknamItems.length - 1) ? 'Next Challenge →' : 'Complete Level →';
+        }
+
+        function advanceSaknamStep() {
+            if (!session.saknamAnswered) return;
+            if (session.stepIdx < session.saknamItems.length - 1) {
+                session.stepIdx++;
+                renderSaknamStep();
+            } else {
+                const total = session.saknamItems.length;
+                const ratio = session.saknamCorrectCount / total;
+                const stars = ratio >= 0.85 ? 3 : (ratio >= 0.6 ? 2 : 1);
+                completeLevelWithStars(stars, 65, `Scored ${session.saknamCorrectCount} / ${total} on ${session.activeLevel.title}`);
+            }
+        }
+
+        /**
+         * 12. MODE C: LEVEL 17 VILLAGE GREETINGS TILE-BUILDER FINALE
+         */
+        function initVillageTiles() {
+            session.stepIdx = 0;
+            loadVillagePhraseStep();
+        }
+
+        function loadVillagePhraseStep() {
+            const total = VILLAGE_PHRASES.length;
+            const item = VILLAGE_PHRASES[session.stepIdx];
+            session.tileSelected = [];
+            session.tileChecked = false;
+
+            document.getElementById('lessonHeaderTitle').textContent = `Level 17 • Village Greetings`;
+            document.getElementById('lessonStepCounter').textContent = `${session.stepIdx + 1} / ${total}`;
+            document.getElementById('lessonProgressBar').style.width = `${Math.round(((session.stepIdx + 1) / total) * 100)}%`;
+
+            document.getElementById('tilePromptEmoji').textContent = item.emoji;
+            document.getElementById('tilePromptEnglish').textContent = item.english;
+            document.getElementById('tilePromptNepali').textContent = item.nepali;
+            document.getElementById('tileFeedbackBox').classList.add('hidden');
+
+            const combined = [
+                ...item.tiles.map((t, idx) => ({ ...t, uid: `ans_${idx}` })),
+                ...item.distractors.map((d, idx) => ({ ...d, uid: `dist_${idx}` }))
+            ].sort(() => Math.random() - 0.5);
+
+            session.tileBank = combined;
+            renderTileTrays();
+        }
+
+        function playCurrentTileAudio() {
+            const item = VILLAGE_PHRASES[session.stepIdx];
+            if (item) speakText(item.pronounce, 'en-US', 440);
+        }
+
+        function renderTileTrays() {
+            const ansTray = document.getElementById('tileAnswerTray');
+            const bankTray = document.getElementById('tileBankTray');
+            const actionBtn = document.getElementById('tileActionBtn');
+
+            ansTray.innerHTML = '';
+            if (session.tileSelected.length === 0) {
+                ansTray.innerHTML = '<span class="text-xs text-slate-400 italic">Tap tiles below to build the phrase...</span>';
+            } else {
+                session.tileSelected.forEach(tile => {
+                    const chip = document.createElement('button');
+                    chip.className = 'px-3 py-2 rounded-xl bg-slatebrand-900 text-white shadow-xs flex flex-col items-center active:scale-95 transition';
+                    chip.innerHTML = `
+                        <span class="font-limbu text-lg text-goldaccent-400 leading-none">${tile.limbu}</span>
+                        <span class="text-[10px] font-bold mt-0.5">${tile.latin}</span>
+                    `;
+                    chip.onclick = () => {
+                        if (session.tileChecked) return;
+                        session.tileSelected = session.tileSelected.filter(t => t.uid !== tile.uid);
+                        renderTileTrays();
+                    };
+                    ansTray.appendChild(chip);
+                });
+            }
+
+            bankTray.innerHTML = '';
+            session.tileBank.forEach(tile => {
+                const isUsed = session.tileSelected.some(s => s.uid === tile.uid);
+                const chip = document.createElement('button');
+                chip.disabled = isUsed || session.tileChecked;
+                chip.className = isUsed
+                    ? 'px-3 py-2 rounded-xl bg-slate-200/60 border border-slate-300 text-transparent select-none'
+                    : 'px-3 py-2 rounded-xl bg-white hover:bg-parchment-50 border-2 border-parchment-300 shadow-xs flex flex-col items-center active:scale-95 transition';
+                chip.innerHTML = `
+                    <span class="font-limbu text-lg ${isUsed ? 'opacity-0' : 'text-slatebrand-900'} leading-none">${tile.limbu}</span>
+                    <span class="text-[10px] font-bold mt-0.5 ${isUsed ? 'opacity-0' : 'text-emerald-700'}">${tile.latin}</span>
+                `;
+                chip.onclick = () => {
+                    playTone(493.9, 'note');
+                    session.tileSelected.push(tile);
+                    renderTileTrays();
+                };
+                bankTray.appendChild(chip);
+            });
+
+            if (!session.tileChecked) {
+                if (session.tileSelected.length > 0) {
+                    actionBtn.disabled = false;
+                    actionBtn.className = 'flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow transition active:scale-95';
+                    actionBtn.textContent = 'Check Answer';
+                } else {
+                    actionBtn.disabled = true;
+                    actionBtn.className = 'flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition';
+                    actionBtn.textContent = 'Check Answer';
+                }
+            }
+        }
+
+        function clearCurrentTileSelection() {
+            if (session.tileChecked) return;
+            session.tileSelected = [];
+            renderTileTrays();
+        }
+
+        function handleTileAction() {
+            const item = VILLAGE_PHRASES[session.stepIdx];
+            const fb = document.getElementById('tileFeedbackBox');
+            const actionBtn = document.getElementById('tileActionBtn');
+
+            if (!session.tileChecked) {
+                const expected = item.tiles.map(t => t.latin).join(' ');
+                const actual = session.tileSelected.map(t => t.latin).join(' ');
+                const isRight = expected === actual;
+
+                fb.classList.remove('hidden');
+                if (isRight) {
+                    session.tileChecked = true;
+                    playTone(523.25, 'success');
+                    fb.className = 'p-3 rounded-2xl text-xs font-bold text-center bg-emerald-100 text-emerald-900 border border-emerald-300';
+                    fb.textContent = `✓ Sewaro! "${item.tiles.map(t => t.limbu).join(' ')}" (${expected}) is right!`;
+                    actionBtn.className = 'flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow transition active:scale-95';
+                    actionBtn.textContent = (session.stepIdx < VILLAGE_PHRASES.length - 1) ? 'Next Phrase →' : 'Complete Finale →';
+                    renderTileTrays();
+                } else {
+                    playTone(165, 'error');
+                    fb.className = 'p-3 rounded-2xl text-xs font-bold text-center bg-rose-100 text-rose-900 border border-rose-300';
+                    fb.textContent = `✗ Try again! Expected order: ${expected}`;
+                }
+            } else {
+                if (session.stepIdx < VILLAGE_PHRASES.length - 1) {
+                    session.stepIdx++;
+                    loadVillagePhraseStep();
+                } else {
+                    completeLevelWithStars(3, 120, 'Completed all Village Greetings & Phrases!');
+                }
+            }
+        }
+
+        /**
+         * 13. LEVEL COMPLETION, STAR RATING & XP REWARD
+         */
+        function completeLevelWithStars(stars, xpEarned, subDetails) {
+            const lvl = session.activeLevel;
+            const prevStars = progress.levelStars[lvl.levelNum] || 0;
+            progress.levelStars[lvl.levelNum] = Math.max(prevStars, stars);
+
+            if (lvl.levelNum === progress.unlockedLevel && progress.unlockedLevel < ADVENTURE_LEVELS.length) {
+                progress.unlockedLevel++;
+            }
+            progress.xp += xpEarned;
+            saveProgress();
+
+            playTone(523.25, 'success');
+            hideAllLessonWorkspaces();
+            document.getElementById('victoryWorkspace').classList.remove('hidden');
+
+            const starEl = document.getElementById('victoryStarsDisplay');
+            starEl.innerHTML = '';
+            for (let s = 1; s <= 3; s++) {
+                const span = document.createElement('span');
+                span.textContent = '★';
+                span.className = s <= stars ? 'text-goldaccent-400 drop-shadow' : 'text-slate-300';
+                starEl.appendChild(span);
+            }
+
+            document.getElementById('victoryBadgeText').textContent = `Level ${lvl.levelNum} Cleared!`;
+            document.getElementById('victoryXpPill').textContent = `+${xpEarned} XP`;
+            document.getElementById('victorySubText').textContent = subDetails;
+        }
+
+        function finishLevelAndReturn() {
+            closeLessonModal();
+        }
+
+        /**
+         * 14. NON-INTRUSIVE SUPPORTER MODAL & TWO-STEP PROGRESS RESET
+         */
+        function openSupporterModal() {
+            updateHudDisplay();
+            resetResetButtonUI();
+            document.getElementById('supporterModal').classList.remove('hidden');
+        }
+
+        function closeSupporterModal() {
+            document.getElementById('supporterModal').classList.add('hidden');
+        }
+
+        function handleSupportAction(message) {
+            playTone(587.33, 'note');
+            try {
+                const tempInput = document.createElement('input');
+                tempInput.value = message;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+            } catch (e) {}
+            showToast(message, '♥');
+        }
+
+        function resetResetButtonUI() {
+            const group = document.getElementById('resetConfirmGroup');
+            group.innerHTML = `
+                <button onclick="promptResetProgress()" class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] transition">
+                    Reset Progress
+                </button>
+            `;
+        }
+
+        function promptResetProgress() {
+            const group = document.getElementById('resetConfirmGroup');
+            group.innerHTML = `
+                <div class="flex items-center gap-1.5">
+                    <button onclick="confirmResetProgress()" class="px-2.5 py-1.5 rounded-xl bg-rose-600 text-white font-bold text-[11px] shadow-xs">
+                        Confirm Reset
+                    </button>
+                    <button onclick="resetResetButtonUI()" class="px-2.5 py-1.5 rounded-xl bg-slate-200 text-slate-700 font-bold text-[11px]">
+                        Cancel
+                    </button>
+                </div>
+            `;
+        }
+
+        function confirmResetProgress() {
+            progress = {
+                unlockedLevel: 1,
+                levelStars: {},
+                masteredChars: [],
+                xp: 0,
+                streak: 1,
+                lastActiveDate: new Date().toDateString()
+            };
+            saveProgress();
+            resetResetButtonUI();
+            closeSupporterModal();
+            renderWindingMap();
+            showToast('Progress reset to Level 1.', '↺');
+        }
+
+        /**
+         * 15. INITIALIZE APPLICATION ON WINDOW LOAD
+         */
+        window.onload = function () {
+            loadProgress();
+            setupCanvasEvents();
+            renderWindingMap();
+        };
+    </script>
+</body>
+</html>

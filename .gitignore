@@ -1,0 +1,18 @@
+# Android Build Caches & Intermediate files
+build_apk/
+*.apk.idsig
+*.idsig
+
+# Scratch files and temporary scripts
+scratch/
+*.log
+temp_*.ttf
+
+# Development & Environment
+.gemini/
+.vercel/
+.vscode/
+.idea/
+Thumbs.db
+
+.vercel
