@@ -87,6 +87,24 @@ function initFirebaseService() {
                 firebaseAuth.onAuthStateChanged(handleFirebaseAuthStateChanged);
                 isAuthListenerAttached = true;
             }
+
+            // Listen for Google Redirect Sign-In results (critical for mobile and redirect flow)
+            if (typeof firebaseAuth.getRedirectResult === 'function') {
+                firebaseAuth.getRedirectResult().then((result) => {
+                    if (result && result.user) {
+                        console.log('[Auth] Google Redirect Sign-In Success:', result.user.email);
+                        if (typeof showToast === 'function') {
+                            showToast(`Signed in as ${result.user.displayName || result.user.email}!`, '✅');
+                        }
+                        handleFirebaseAuthStateChanged(result.user);
+                    }
+                }).catch((err) => {
+                    if (err && err.code && err.code !== 'auth/popup-closed-by-user') {
+                        console.warn('[Auth] Redirect sign-in notice:', err);
+                        handleGoogleAuthError(err);
+                    }
+                });
+            }
         }
 
         if (typeof window.firebase.firestore === 'function') {
@@ -122,6 +140,13 @@ async function handleFirebaseAuthStateChanged(user) {
         await restoreCloudProgress(user.uid);
         updateAuthHUD();
         updateAuthUI();
+
+        // Dismiss auth modal and welcome screen on successful login
+        const modal = document.getElementById('authModal');
+        if (modal) modal.classList.add('hidden');
+        if (typeof dismissWelcomeScreen === 'function') {
+            dismissWelcomeScreen();
+        }
     } else {
         if (currentUser && !currentUser.isLocalAccount) {
             currentUser = null;
@@ -159,22 +184,32 @@ async function signInWithGoogleFirebase() {
             const provider = new window.firebase.auth.GoogleAuthProvider();
             provider.addScope('profile');
             provider.addScope('email');
-            // Explicitly force Google to show the account chooser popup!
+            // Explicitly force Google to show the account chooser
             provider.setCustomParameters({ prompt: 'select_account' });
 
             if (typeof showToast === 'function') {
-                showToast('Opening Google Account Chooser...', '⏳');
+                showToast('Connecting to Google...', '⏳');
             }
 
-            // Real Google Popup Window invocation
+            const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+            // On mobile or standalone PWA, signInWithRedirect is much more reliable than desktop popups
+            if (isMobileDevice && typeof firebaseAuth.signInWithRedirect === 'function') {
+                await firebaseAuth.signInWithRedirect(provider);
+                return;
+            }
+
+            // On desktop / standard browsers, try popup first
             const res = await firebaseAuth.signInWithPopup(provider);
             if (res && res.user) {
-                if (typeof showToast === 'function') showToast('Signed in with Google!', '✅');
+                if (typeof showToast === 'function') showToast(`Signed in as ${res.user.displayName || res.user.email}!`, '✅');
+                handleFirebaseAuthStateChanged(res.user);
                 return;
             }
         } catch (error) {
             console.warn('[Auth] Google OAuth notice:', error);
-            if (error.code === 'auth/popup-blocked') {
+            // If popup was blocked or failed, seamlessly fall back to redirect
+            if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/internal-error') {
                 try {
                     const provider = new window.firebase.auth.GoogleAuthProvider();
                     provider.setCustomParameters({ prompt: 'select_account' });
@@ -208,8 +243,8 @@ function handleGoogleAuthError(error) {
         message = 'Google blocked the popup because the current API Key is a placeholder. To make Google pop up your real accounts, please connect your Firebase Web project API key.';
     } else if (errCode === 'auth/unauthorized-domain') {
         const domain = (typeof window !== 'undefined' && window.location) ? window.location.hostname : 'this domain';
-        title = 'Authorized Domain Needed';
-        message = `Google popup requires "${domain}" to be added to Firebase Console under Authentication → Settings → Authorized domains.`;
+        title = 'Authorize Domain in Firebase';
+        message = `To enable Google Sign-In on "${domain}", add it to your Firebase Console: Authentication ➔ Settings ➔ Authorized Domains ➔ Add "${domain}".`;
     } else if (errCode === 'auth/popup-blocked') {
         title = 'Browser Blocked Popup';
         message = 'Your browser blocked the Google popup window. Please click the lock/settings icon in your address bar and allow popups for this site.';
