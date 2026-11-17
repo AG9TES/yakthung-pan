@@ -9,7 +9,7 @@ var CLOUD_CONFIG_KEY = 'yakthung_cloud_config';
 var LOCAL_ACCOUNTS_KEY = 'yakthung_local_accounts';
 
 var DEFAULT_CLOUD_CONFIG = {
-    apiKey: "AIzaSyA1g1v4YH4mSCOlMoV4pK4JNIxGEFKkbVU",
+    apiKey: "AIzaSyCTtRZBe_CGc0k0xZzQ8KDzJEAFoN9Huo8",
     authDomain: "yakthung-pan.firebaseapp.com",
     projectId: "yakthung-pan",
     storageBucket: "yakthung-pan.firebasestorage.app",

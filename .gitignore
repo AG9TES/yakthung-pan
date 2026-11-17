@@ -10,9 +10,29 @@ temp_*.ttf
 
 # Development & Environment
 .gemini/
-.vercel/
+# Keystore & Secrets
+debug.keystore
+*.keystore
+
+# Vercel
+.vercel
+.vercel//
 .vscode/
 .idea/
 Thumbs.db
 
+# Keystore & Secrets
+debug.keystore
+*.keystore
+
+# Vercel
 .vercel
+.vercel/
+
+# Keystore & Secrets
+debug.keystore
+*.keystore
+
+# Vercel
+.vercel
+.vercel/
