@@ -591,6 +591,7 @@ async function signInWithEmailPassword(email = null, password = null) {
                 }
                 const modal = document.getElementById('authModal');
                 if (modal) modal.classList.add('hidden');
+                if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen();
                 return;
             }
         } catch (err) {
@@ -631,6 +632,7 @@ async function signInWithEmailPassword(email = null, password = null) {
                 }
                 const modal = document.getElementById('authModal');
                 if (modal) modal.classList.add('hidden');
+                if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen();
                 return;
             } else {
                 if (typeof showToast === 'function') showToast('Incorrect password. Please try again.', '❌');
@@ -692,6 +694,7 @@ async function signUpWithEmailPassword(username = null, email = null, password =
                 if (typeof showToast === 'function') showToast(`Welcome, ${chosenUsername}! Account created.`, '🎉');
                 const modal = document.getElementById('authModal');
                 if (modal) modal.classList.add('hidden');
+                if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen();
                 return;
             }
         } catch (err) {
@@ -746,11 +749,29 @@ function saveLocalAccountRecord(username, email, password, id) {
     } catch (e) {}
 }
 
-function resetPasswordWithFirebase() {
-    const emailInput = prompt('Enter your registered email address for password reset:');
-    if (emailInput && emailInput.trim()) {
-        if (typeof showToast === 'function') showToast('Password reset instructions sent to ' + emailInput.trim(), '📧');
+async function resetPasswordWithFirebase() {
+    let emailInput = prompt('Enter your registered email address for password reset:');
+    if (!emailInput || !emailInput.trim()) return;
+    emailInput = emailInput.trim().toLowerCase();
+
+    if (isFirebaseAvailable() && firebaseAuth) {
+        try {
+            await firebaseAuth.sendPasswordResetEmail(emailInput);
+            if (typeof showToast === 'function') {
+                showToast(`Password reset link sent to ${emailInput}! Check your inbox.`, '📧');
+            }
+            return;
+        } catch (err) {
+            console.warn('[Auth] Reset password error:', err);
+            if (err.code === 'auth/user-not-found') {
+                if (typeof showToast === 'function') showToast('No account found with this email.', '⚠️');
+                return;
+            }
+            if (typeof showToast === 'function') showToast(err.message || 'Could not send reset email.', '⚠️');
+            return;
+        }
     }
+    if (typeof showToast === 'function') showToast('Password reset instructions sent to ' + emailInput, '📧');
 }
 
 function hashCode(str) {
@@ -1091,11 +1112,15 @@ function switchAuthTab(tabId) {
         activateBtn(btnEmail);
         if (titleEl) titleEl.textContent = 'Log In with Email';
         if (subEl) subEl.textContent = 'Access your learning trail & synced progress';
+        const emInput = document.getElementById('firebaseEmailInput');
+        if (emInput) setTimeout(() => emInput.focus(), 150);
     } else if (tabId === 'register') {
         if (tabRegister) tabRegister.classList.remove('hidden');
         activateBtn(btnRegister);
         if (titleEl) titleEl.textContent = 'Create New Account';
         if (subEl) subEl.textContent = 'Choose your username & start learning Limbu';
+        const usrInput = document.getElementById('firebaseRegUsernameInput');
+        if (usrInput) setTimeout(() => usrInput.focus(), 150);
     } else {
         // Default: Google
         if (tabGoogle) tabGoogle.classList.remove('hidden');
