@@ -129,6 +129,15 @@ function completeLevelWithStars(stars, xpEarned, subDetails) {
         try { syncCloudProgress(false); } catch (e) {}
     }
 
+    // Telemetry: Log level completion for the Admin Dashboard
+    if (typeof recordAdminActivity === 'function') {
+        recordAdminActivity('level_complete', {
+            level: nextUn,
+            xp: progress.xp,
+            details: `Completed Level ${lvl.levelNum} with ${stars} Stars (+${xpEarned || 40} XP)`
+        });
+    }
+
     try { playTone(523.25, 'success'); } catch (e) {}
 
     // Show Victory Screen

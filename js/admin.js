@@ -181,22 +181,29 @@ function initRealtimeEngine() {
     // 2. Baseline local load
     loadInitialBaselineData();
 
-    // 3. Connect Firestore Realtime `onSnapshot` listeners
+    // 3. Connect Cloud Hub Realtime (Universal cross-device sync between Phone App and Dashboard)
+    setupCloudHubRealtime();
+
+    // 4. Connect Firestore Realtime `onSnapshot` listeners
     setupFirestoreRealtime();
 
-    // 4. Connect Browser BroadcastChannel (Instant cross-tab realtime)
+    // 5. Connect Browser BroadcastChannel (Instant cross-tab realtime)
     setupBroadcastChannelRealtime();
 
-    // 5. Connect Window Storage Event (localStorage cross-tab sync)
+    // 6. Connect Window Storage Event (localStorage cross-tab sync)
     window.addEventListener('storage', handleStorageEvent);
 
-    // 6. Live Relative Timestamp Ticker (Every 10 seconds)
+    // 7. Live Relative Timestamp Ticker (Every 10 seconds)
     if (!liveTimeTicker) {
         liveTimeTicker = setInterval(updateAllTimeAgoStrings, 10000);
     }
 }
 
 function teardownRealtimeListeners() {
+    if (cloudHubPollTimer) {
+        clearInterval(cloudHubPollTimer);
+        cloudHubPollTimer = null;
+    }
     if (logsUnsubscribe) {
         try { logsUnsubscribe(); } catch (e) {}
         logsUnsubscribe = null;
@@ -214,6 +221,65 @@ function teardownRealtimeListeners() {
         liveTimeTicker = null;
     }
     window.removeEventListener('storage', handleStorageEvent);
+}
+
+// Universal Cloud Telemetry Sync between App & Dashboard
+var CLOUD_HUB_OBJECT_ID = 'ff808181a09d98f701a1ea6ca68a0940';
+var CLOUD_HUB_URL = 'https://api.restful-api.dev/objects/' + CLOUD_HUB_OBJECT_ID;
+var cloudHubPollTimer = null;
+var isFirstCloudHubLoad = true;
+
+async function pollCloudHub() {
+    try {
+        const res = await fetch(CLOUD_HUB_URL, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        const data = json.data;
+        if (!data) return;
+
+        updateConnectionIndicator('cloud');
+
+        // Check for new logs
+        if (Array.isArray(data.logs)) {
+            if (isFirstCloudHubLoad) {
+                isFirstCloudHubLoad = false;
+                mergeLogsIntoCache(data.logs);
+                updateKPICards();
+                renderCurrentTab();
+            } else {
+                const newEntries = [];
+                for (const log of data.logs) {
+                    const exists = cachedLogs.some(l => (l.id && l.id === log.id) || (l.timestamp === log.timestamp && l.email === log.email));
+                    if (!exists) {
+                        newEntries.push(log);
+                    }
+                }
+                newEntries.reverse().forEach(entry => {
+                    handleIncomingRealtimeEntry(entry, true);
+                });
+            }
+        }
+
+        // Merge learners
+        if (data.learners && typeof data.learners === 'object') {
+            Object.values(data.learners).forEach(user => {
+                updateLearnerInRoster(user);
+            });
+            updateKPICards();
+            if (currentAdminTab === 'learners' || currentAdminTab === 'analytics') {
+                renderCurrentTab();
+            }
+        }
+    } catch (e) {
+        console.warn('[Admin Realtime] Cloud hub poll notice:', e);
+    }
+}
+
+function setupCloudHubRealtime() {
+    if (cloudHubPollTimer) clearInterval(cloudHubPollTimer);
+    isFirstCloudHubLoad = true;
+    pollCloudHub();
+    cloudHubPollTimer = setInterval(pollCloudHub, 3000); // Poll every 3 seconds for live sync
 }
 
 function setupFirestoreRealtime() {
@@ -604,13 +670,45 @@ function simulateRealtimeLoginEvent() {
     };
 
     // Save and broadcast through standard engine
-    if (typeof recordAdminActivity === 'function') {
-        recordAdminActivity('login', entry);
-    } else {
-        handleIncomingRealtimeEntry(entry, true);
-    }
+    handleIncomingRealtimeEntry(entry, true);
+    pushToCloudHubDirect(entry);
 
     showAdminToast(`⚡ Simulated Real-Time Login: ${randomName}`, '⚡');
+}
+
+async function pushToCloudHubDirect(entry) {
+    try {
+        const getRes = await fetch(CLOUD_HUB_URL, { cache: 'no-store' });
+        if (getRes.ok) {
+            const json = await getRes.json();
+            const hubData = json.data || { logs: [], learners: {} };
+            if (!Array.isArray(hubData.logs)) hubData.logs = [];
+            if (!hubData.learners) hubData.learners = {};
+            hubData.logs.unshift(entry);
+            if (hubData.logs.length > 250) hubData.logs = hubData.logs.slice(0, 250);
+            const key = entry.email ? entry.email.toLowerCase() : entry.userId;
+            hubData.learners[key] = {
+                userId: entry.userId,
+                userName: entry.userName,
+                email: entry.email,
+                provider: entry.provider,
+                lastActive: entry.timestamp,
+                lastAction: entry.action,
+                level: entry.level || 1,
+                xp: entry.xp || 0,
+                device: entry.device
+            };
+            hubData.updatedAt = new Date().toISOString();
+            await fetch(CLOUD_HUB_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: 'Yakthung Pan Production Cloud Hub',
+                    data: hubData
+                })
+            });
+        }
+    } catch (e) {}
 }
 
 // =====================================================================

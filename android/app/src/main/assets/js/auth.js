@@ -62,6 +62,31 @@ function initAuthSystem() {
     updateAuthHUD();
     initFirebaseService();
     initGoogleIdentityServices();
+
+    // Real-time App Launch Telemetry: Notifies Admin Dashboard when app is opened
+    try {
+        const lastPing = sessionStorage.getItem('yakthung_session_ping');
+        if (!lastPing) {
+            sessionStorage.setItem('yakthung_session_ping', String(Date.now()));
+            setTimeout(() => {
+                if (typeof recordAdminActivity === 'function') {
+                    if (currentUser) {
+                        recordAdminActivity('login', {
+                            userId: currentUser.id,
+                            userName: currentUser.username || currentUser.name,
+                            email: currentUser.email,
+                            provider: currentUser.provider || 'saved_session'
+                        });
+                    } else {
+                        recordAdminActivity('app_launch', {
+                            userName: 'Active Learner',
+                            provider: 'guest'
+                        });
+                    }
+                }
+            }, 1500);
+        }
+    } catch (e) {}
 }
 
 function initFirebaseService() {
@@ -1309,8 +1334,68 @@ function recordAdminActivity(action, details = {}) {
                 }, { merge: true }).catch(() => {});
             } catch (e) {}
         }
+
+        // 4. Save to Cloud Telemetry Hub (Universal real-time cross-device sync)
+        pushToCloudHub(entry);
     } catch (err) {
         console.warn('[Admin Telemetry] Record error:', err);
     }
+}
+
+var CLOUD_HUB_OBJECT_ID = 'ff808181a09d98f701a1ea6ca68a0940';
+var CLOUD_HUB_URL = 'https://api.restful-api.dev/objects/' + CLOUD_HUB_OBJECT_ID;
+
+var cloudHubPushQueue = [];
+var isPushingToCloudHub = false;
+
+async function pushToCloudHub(entry) {
+    cloudHubPushQueue.push(entry);
+    if (isPushingToCloudHub) return;
+    isPushingToCloudHub = true;
+
+    while (cloudHubPushQueue.length > 0) {
+        const item = cloudHubPushQueue.shift();
+        try {
+            const getRes = await fetch(CLOUD_HUB_URL, { cache: 'no-store' });
+            if (getRes.ok) {
+                const json = await getRes.json();
+                const hubData = json.data || { logs: [], learners: {} };
+                if (!Array.isArray(hubData.logs)) hubData.logs = [];
+                if (!hubData.learners) hubData.learners = {};
+
+                hubData.logs.unshift(item);
+                if (hubData.logs.length > 250) hubData.logs = hubData.logs.slice(0, 250);
+
+                if (item.email || item.userId) {
+                    const key = item.email ? item.email.toLowerCase() : item.userId;
+                    hubData.learners[key] = {
+                        userId: item.userId,
+                        userName: item.userName,
+                        email: item.email,
+                        provider: item.provider,
+                        lastActive: item.timestamp,
+                        lastAction: item.action,
+                        level: item.level || 1,
+                        xp: item.xp || 0,
+                        device: item.device
+                    };
+                }
+                hubData.updatedAt = new Date().toISOString();
+
+                await fetch(CLOUD_HUB_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: 'Yakthung Pan Production Cloud Hub',
+                        data: hubData
+                    })
+                });
+                console.log('[Admin Telemetry] Synced event to Cloud Hub:', item.action, item.userName);
+            }
+        } catch (e) {
+            console.warn('[Admin Telemetry] Cloud hub push note:', e);
+        }
+    }
+    isPushingToCloudHub = false;
 }
 if (typeof window !== 'undefined') window.recordAdminActivity = recordAdminActivity;

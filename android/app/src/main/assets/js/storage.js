@@ -73,6 +73,11 @@ function saveProgress() {
         console.warn('Could not save localStorage:', e);
     }
     updateHudDisplay();
+
+    // Automatically sync cloud & notify Admin Dashboard of real-time progress
+    if (typeof syncCloudProgress === 'function') {
+        try { syncCloudProgress(false); } catch (e) {}
+    }
 }
 
 function updateHudDisplay() {
