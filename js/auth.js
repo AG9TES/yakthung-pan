@@ -61,6 +61,7 @@ function initAuthSystem() {
 
     updateAuthHUD();
     initFirebaseService();
+    initGoogleIdentityServices();
 }
 
 function initFirebaseService() {
@@ -158,24 +159,130 @@ async function handleFirebaseAuthStateChanged(user) {
     }
 }
 
+var GOOGLE_WEB_CLIENT_ID = "923150025349-92q8j8447cedud48e68pp2ungs0b82b9.apps.googleusercontent.com";
+
 // ---------------------------------------------------------------------
-// Sign-In & Registration Handlers (100% Reliable with Seamless Fallback)
+// Sign-In & Registration Handlers (Web-Based Authentication Flow)
 // ---------------------------------------------------------------------
 
-// 1. Continue with Google (Pops out Google Account Chooser!)
-async function handleGoogleSignInBtnClick() {
-    // If running inside Android APK with Native Auth Bridge, pop up the device's native account chooser!
-    if (typeof window !== 'undefined' && window.AndroidNativeAuth && typeof window.AndroidNativeAuth.promptGoogleAccountPicker === 'function') {
-        if (typeof showToast === 'function') {
-            showToast('Choose your Google account...', '⏳');
+/**
+ * Google Identity Services (GIS) Web Initialization
+ * Initializes Google's modern web-based authentication flow & One Tap.
+ */
+function initGoogleIdentityServices() {
+    if (typeof window === 'undefined') return;
+
+    if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+        if (typeof window.addEventListener === 'function') {
+            window.addEventListener('load', () => {
+                setTimeout(initGoogleIdentityServices, 600);
+            }, { once: true });
         }
+        return;
+    }
+
+    try {
+        window.google.accounts.id.initialize({
+            client_id: GOOGLE_WEB_CLIENT_ID,
+            callback: handleGoogleIdentityCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true
+        });
+
+        // Prompt Google One Tap on web if user is not already logged in
+        if (!currentUser) {
+            window.google.accounts.id.prompt((notification) => {
+                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                    console.log('[Auth] Google One Tap web prompt dismissed or skipped.');
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('[Auth] GIS initialization note:', e);
+    }
+}
+if (typeof window !== 'undefined') {
+    window.initGoogleIdentityServices = initGoogleIdentityServices;
+}
+
+/**
+ * Google Identity Services Web Callback (Credential Response)
+ * Receives the verified Google ID Token (JWT) directly from Google's web flow.
+ */
+async function handleGoogleIdentityCredentialResponse(response) {
+    if (!response || !response.credential) return;
+    console.log('[Auth] Web Google Credential received!');
+    if (typeof showToast === 'function') {
+        showToast('Verifying Google credentials...', '⏳');
+    }
+
+    // 1. Authenticate with Firebase using Web Google Credential
+    if (isFirebaseAvailable() && firebaseAuth && window.firebase && window.firebase.auth && window.firebase.auth.GoogleAuthProvider) {
         try {
-            window.AndroidNativeAuth.promptGoogleAccountPicker();
-            return;
+            const credential = window.firebase.auth.GoogleAuthProvider.credential(response.credential);
+            const userCredential = await firebaseAuth.signInWithCredential(credential);
+            if (userCredential && userCredential.user) {
+                if (typeof showToast === 'function') {
+                    showToast(`Signed in as ${userCredential.user.displayName || userCredential.user.email}!`, '✅');
+                }
+                handleFirebaseAuthStateChanged(userCredential.user);
+                return;
+            }
         } catch (e) {
-            console.warn('[Auth] Native account picker failed, falling back to Firebase:', e);
+            console.warn('[Auth] Firebase credential exchange warning:', e);
         }
     }
+
+    // 2. Resilient Web Fallback: Decode verified JWT payload directly
+    try {
+        const payloadBase64 = response.credential.split('.')[1];
+        const payloadJson = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+        if (payloadJson && payloadJson.email) {
+            const profile = {
+                id: payloadJson.sub || ('g_' + Math.abs(hashCode(payloadJson.email.toLowerCase()))),
+                name: payloadJson.name || payloadJson.email.split('@')[0],
+                username: payloadJson.name || payloadJson.email.split('@')[0],
+                email: payloadJson.email,
+                picture: payloadJson.picture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(payloadJson.name || 'User')}`,
+                provider: 'google',
+                isLocalAccount: true,
+                lastSynced: new Date().toISOString()
+            };
+            applySignedInUser(profile);
+            saveLocalAccountRecord(profile.name, profile.email, 'google_web_auth', profile.id);
+            if (typeof showToast === 'function') {
+                showToast(`Welcome, ${profile.name}! Signed in with Google.`, '✅');
+            }
+            if (typeof syncCloudProgress === 'function') {
+                try { syncCloudProgress(false); } catch (e) {}
+            }
+        }
+    } catch (err) {
+        console.error('[Auth] Failed to decode Google JWT:', err);
+    }
+}
+if (typeof window !== 'undefined') {
+    window.handleGoogleIdentityCredentialResponse = handleGoogleIdentityCredentialResponse;
+}
+
+// 1. Web-Based Google Authentication Flow (Pops out Web OAuth Chooser)
+async function handleGoogleSignInBtnClick() {
+    // Check if Google Identity Services prompt is ready
+    if (typeof window !== 'undefined' && window.google && window.google.accounts && window.google.accounts.id) {
+        try {
+            window.google.accounts.id.prompt((notification) => {
+                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                    signInWithGoogleFirebase();
+                }
+            });
+            await signInWithGoogleFirebase();
+            return;
+        } catch (e) {
+            console.warn('[Auth] GIS prompt fallback to OAuth popup:', e);
+        }
+    }
+
+    // Direct Web-Based Firebase Google OAuth (Popup Flow)
     await signInWithGoogleFirebase();
 }
 
@@ -266,20 +373,24 @@ async function signInWithGoogleFirebase() {
                 showToast('Connecting to Google...', '⏳');
             }
 
-            const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-            // On mobile or standalone PWA, signInWithRedirect is much more reliable than desktop popups
-            if (isMobileDevice && typeof firebaseAuth.signInWithRedirect === 'function') {
-                await firebaseAuth.signInWithRedirect(provider);
-                return;
-            }
-
-            // On desktop / standard browsers, try popup first
-            const res = await firebaseAuth.signInWithPopup(provider);
-            if (res && res.user) {
-                if (typeof showToast === 'function') showToast(`Signed in as ${res.user.displayName || res.user.email}!`, '✅');
-                handleFirebaseAuthStateChanged(res.user);
-                return;
+            // Web-Based Authentication Flow: Try clean OAuth popup first
+            try {
+                const res = await firebaseAuth.signInWithPopup(provider);
+                if (res && res.user) {
+                    if (typeof showToast === 'function') showToast(`Signed in as ${res.user.displayName || res.user.email}!`, '✅');
+                    handleFirebaseAuthStateChanged(res.user);
+                    return;
+                }
+            } catch (popupErr) {
+                // If popup was blocked by browser, seamlessly fall back to web redirect flow
+                if (popupErr && (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request')) {
+                    console.log('[Auth] Popup blocked, using web redirect flow...');
+                    if (typeof firebaseAuth.signInWithRedirect === 'function') {
+                        await firebaseAuth.signInWithRedirect(provider);
+                        return;
+                    }
+                }
+                throw popupErr;
             }
         } catch (error) {
             console.warn('[Auth] Google OAuth notice:', error);
