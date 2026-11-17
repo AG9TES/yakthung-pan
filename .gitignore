@@ -57,3 +57,5 @@ android/app/build/
 # Vercel
 .vercel
 .vercel/
+
+.vercel

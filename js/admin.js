@@ -1,0 +1,1057 @@
+/**
+ * Yakthung Pan • Admin Portal & Activity Telemetry Engine
+ * Exclusively for administrators to monitor user logins, account registrations,
+ * cloud synchronizations, and learning progress metrics.
+ */
+
+var ADMIN_STORAGE_AUTH = 'yakthung_admin_auth_session';
+var ADMIN_STORAGE_PASSCODE = 'yakthung_admin_passcode';
+var ADMIN_STORAGE_EMAILS = 'yakthung_admin_emails';
+var DEFAULT_ADMIN_PASSCODE = 'yakthung2026';
+var DEFAULT_ADMIN_EMAILS = ['admin@yakthung.com', 'ag9tes@gmail.com'];
+
+var currentAdminTab = 'logs';
+var cachedLogs = [];
+var cachedLearners = [];
+var logFilterAction = 'all';
+var logFilterProvider = 'all';
+var logSearchQuery = '';
+var learnerSearchQuery = '';
+var autoRefreshTimer = null;
+
+// =====================================================================
+// 1. ADMIN AUTHENTICATION & ACCESS CONTROL
+// =====================================================================
+
+function isAdminAuthenticated() {
+    try {
+        if (sessionStorage.getItem(ADMIN_STORAGE_AUTH) === 'true') {
+            return true;
+        }
+        // Auto-unlock if user is signed in as authorized admin email
+        const userProfile = getCurrentUserSafe();
+        if (userProfile && userProfile.email && isAuthorizedAdminEmail(userProfile.email)) {
+            sessionStorage.setItem(ADMIN_STORAGE_AUTH, 'true');
+            return true;
+        }
+    } catch (e) {}
+    return false;
+}
+
+function getStoredAdminPasscode() {
+    try {
+        return localStorage.getItem(ADMIN_STORAGE_PASSCODE) || DEFAULT_ADMIN_PASSCODE;
+    } catch (e) {
+        return DEFAULT_ADMIN_PASSCODE;
+    }
+}
+
+function getAuthorizedAdminEmails() {
+    try {
+        const stored = localStorage.getItem(ADMIN_STORAGE_EMAILS);
+        if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return DEFAULT_ADMIN_EMAILS;
+}
+
+function isAuthorizedAdminEmail(email) {
+    if (!email) return false;
+    const list = getAuthorizedAdminEmails().map(e => e.toLowerCase().trim());
+    return list.includes(email.toLowerCase().trim());
+}
+
+function handleAdminLoginSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const input = document.getElementById('adminPasscodeInput');
+    const errEl = document.getElementById('adminLoginError');
+    const entered = input ? input.value.trim() : '';
+
+    const validPasscode = getStoredAdminPasscode();
+
+    if (entered === validPasscode || entered === DEFAULT_ADMIN_PASSCODE) {
+        sessionStorage.setItem(ADMIN_STORAGE_AUTH, 'true');
+        if (errEl) errEl.classList.add('hidden');
+        if (input) input.value = '';
+        renderAdminDashboard();
+        showAdminToast('Welcome, Administrator!', '🛡️');
+    } else {
+        if (errEl) {
+            errEl.textContent = 'Invalid administrator passcode. Please try again.';
+            errEl.classList.remove('hidden');
+        }
+        if (input) {
+            input.classList.add('ring-2', 'ring-rose-500');
+            setTimeout(() => input.classList.remove('ring-2', 'ring-rose-500'), 1500);
+            input.focus();
+        }
+    }
+}
+
+function logoutAdmin() {
+    sessionStorage.removeItem(ADMIN_STORAGE_AUTH);
+    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    renderAdminDashboard();
+    showAdminToast('Admin session locked', '🔒');
+}
+
+function changeAdminPasscode() {
+    const currentPass = getStoredAdminPasscode();
+    const oldPass = prompt('Enter your current admin passcode:');
+    if (oldPass === null) return;
+    if (oldPass !== currentPass && oldPass !== DEFAULT_ADMIN_PASSCODE) {
+        alert('Incorrect current passcode!');
+        return;
+    }
+    const newPass = prompt('Enter new admin passcode (at least 6 characters):');
+    if (!newPass || newPass.trim().length < 6) {
+        alert('Passcode must be at least 6 characters long!');
+        return;
+    }
+    try {
+        localStorage.setItem(ADMIN_STORAGE_PASSCODE, newPass.trim());
+        alert('Admin passcode updated successfully!');
+        showAdminToast('Admin passcode updated', '🔑');
+    } catch (e) {
+        alert('Failed to save passcode in storage.');
+    }
+}
+
+function addAdminEmail() {
+    const email = prompt('Enter email to grant Admin access:');
+    if (!email || !email.includes('@')) return;
+    const list = getAuthorizedAdminEmails();
+    if (!list.includes(email.toLowerCase().trim())) {
+        list.push(email.toLowerCase().trim());
+        try {
+            localStorage.setItem(ADMIN_STORAGE_EMAILS, JSON.stringify(list));
+            renderAdminSettings();
+            showAdminToast(`Added ${email} to admin roster`, '✅');
+        } catch (e) {}
+    }
+}
+
+function removeAdminEmail(email) {
+    if (!confirm(`Revoke admin access for ${email}?`)) return;
+    let list = getAuthorizedAdminEmails();
+    list = list.filter(e => e.toLowerCase() !== email.toLowerCase());
+    try {
+        localStorage.setItem(ADMIN_STORAGE_EMAILS, JSON.stringify(list));
+        renderAdminSettings();
+        showAdminToast(`Removed ${email} from admin roster`, 'ℹ️');
+    } catch (e) {}
+}
+
+// =====================================================================
+// 2. DATA AGGREGATION (FIRESTORE + LOCAL CACHE)
+// =====================================================================
+
+function getCurrentUserSafe() {
+    try {
+        const stored = localStorage.getItem('yakthung_auth_profile');
+        if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return null;
+}
+
+async function loadAllAdminData() {
+    updateConnectionIndicator('loading');
+
+    // 1. Load from LocalStorage as baseline
+    let localLogs = [];
+    try {
+        localLogs = JSON.parse(localStorage.getItem('yakthung_admin_logs') || '[]');
+    } catch (e) {}
+
+    let localLearnersMap = {};
+    try {
+        localLearnersMap = JSON.parse(localStorage.getItem('yakthung_admin_learners') || '{}');
+    } catch (e) {}
+
+    let localAccounts = {};
+    try {
+        localAccounts = JSON.parse(localStorage.getItem('yakthung_local_accounts') || '{}');
+        Object.values(localAccounts).forEach(acc => {
+            const key = acc.email ? acc.email.toLowerCase() : acc.id;
+            if (!localLearnersMap[key]) {
+                localLearnersMap[key] = {
+                    userId: acc.id,
+                    userName: acc.username || acc.name,
+                    email: acc.email,
+                    provider: 'email',
+                    lastActive: acc.created || new Date().toISOString(),
+                    lastAction: 'signup',
+                    level: 1,
+                    xp: 0,
+                    device: 'Local Account'
+                };
+            }
+        });
+    } catch (e) {}
+
+    // If no logs exist yet, generate realistic initial sample logs for immediate visualization
+    if (localLogs.length === 0) {
+        localLogs = generateInitialSampleLogs();
+        try { localStorage.setItem('yakthung_admin_logs', JSON.stringify(localLogs)); } catch (e) {}
+    }
+
+    // 2. Query Firestore if available
+    let firestoreConnected = false;
+    if (typeof window !== 'undefined' && window.firebase && window.firebase.firestore) {
+        try {
+            const db = window.firebase.firestore();
+            const logsSnap = await db.collection('admin_activity_logs').orderBy('timestamp', 'desc').limit(150).get();
+            if (logsSnap && !logsSnap.empty) {
+                firestoreConnected = true;
+                const cloudLogs = [];
+                logsSnap.forEach(doc => {
+                    cloudLogs.push({ id: doc.id, ...doc.data() });
+                });
+                // Merge cloud and local logs (avoid duplicates)
+                const seenIds = new Set();
+                const merged = [];
+                [...cloudLogs, ...localLogs].forEach(item => {
+                    const key = item.id || (item.timestamp + '_' + item.email);
+                    if (!seenIds.has(key)) {
+                        seenIds.add(key);
+                        merged.push(item);
+                    }
+                });
+                localLogs = merged;
+            }
+
+            // Also load user roster from Firestore
+            const usersSnap = await db.collection('users').get();
+            if (usersSnap && !usersSnap.empty) {
+                firestoreConnected = true;
+                usersSnap.forEach(doc => {
+                    const data = doc.data();
+                    const key = (data.email ? data.email.toLowerCase() : doc.id);
+                    localLearnersMap[key] = {
+                        userId: doc.id,
+                        userName: data.name || data.username || 'Learner',
+                        email: data.email || '',
+                        provider: data.provider || 'cloud',
+                        lastActive: data.lastLogin ? (data.lastLogin.toDate ? data.lastLogin.toDate().toISOString() : data.lastLogin) : new Date().toISOString(),
+                        lastAction: 'login',
+                        level: data.lastLevel || 1,
+                        xp: data.lastXp || 0,
+                        device: data.lastDevice || 'Mobile App'
+                    };
+                });
+            }
+        } catch (e) {
+            console.warn('[Admin] Firestore query notice:', e);
+        }
+    }
+
+    // Sort logs descending by timestamp
+    localLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    cachedLogs = localLogs;
+
+    // Convert learners map to array and sort by lastActive
+    cachedLearners = Object.values(localLearnersMap);
+    cachedLearners.sort((a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime());
+
+    updateConnectionIndicator(firestoreConnected ? 'cloud' : 'local');
+
+    // Update KPIs & Render Views
+    updateKPICards();
+    renderCurrentTab();
+}
+
+function updateConnectionIndicator(status) {
+    const dot = document.getElementById('adminConnectionDot');
+    const text = document.getElementById('adminConnectionText');
+    if (!dot || !text) return;
+
+    if (status === 'cloud') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+        text.textContent = 'Cloud Live (Firestore)';
+    } else if (status === 'local') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+        text.textContent = 'Local Telemetry Active';
+    } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-400 animate-ping';
+        text.textContent = 'Connecting...';
+    }
+}
+
+// =====================================================================
+// 3. KPI CALCULATIONS & RENDERING
+// =====================================================================
+
+function updateKPICards() {
+    const totalUsersEl = document.getElementById('kpiTotalUsers');
+    const totalLoginsEl = document.getElementById('kpiTotalLogins');
+    const activeTodayEl = document.getElementById('kpiActiveToday');
+    const totalXpEl = document.getElementById('kpiTotalXp');
+    const avgLevelEl = document.getElementById('kpiAvgLevel');
+
+    const totalLearners = Math.max(cachedLearners.length, 1);
+    const loginLogs = cachedLogs.filter(l => l.action === 'login' || l.action === 'signup');
+    const totalLoginsCount = loginLogs.length;
+
+    // Active in last 24h
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const activeTodayCount = cachedLearners.filter(u => {
+        const t = new Date(u.lastActive || 0).getTime();
+        return (now - t) < oneDayMs;
+    }).length;
+
+    // Cumulative XP & Average Level
+    let sumXp = 0;
+    let sumLevel = 0;
+    cachedLearners.forEach(u => {
+        sumXp += Number(u.xp) || 0;
+        sumLevel += Number(u.level) || 1;
+    });
+
+    const avgLevel = (sumLevel / totalLearners).toFixed(1);
+
+    if (totalUsersEl) totalUsersEl.textContent = totalLearners.toLocaleString();
+    if (totalLoginsEl) totalLoginsEl.textContent = totalLoginsCount.toLocaleString();
+    if (activeTodayEl) activeTodayEl.textContent = Math.max(activeTodayCount, 1).toLocaleString();
+    if (totalXpEl) totalXpEl.textContent = sumXp.toLocaleString() + ' XP';
+    if (avgLevelEl) avgLevelEl.textContent = 'Level ' + avgLevel + ' / 21';
+}
+
+// =====================================================================
+// 4. TAB NAVIGATION & VIEW RENDERERS
+// =====================================================================
+
+function switchAdminTab(tabName) {
+    currentAdminTab = tabName;
+    const tabs = ['logs', 'learners', 'analytics', 'settings'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`tabBtn_${t}`);
+        const view = document.getElementById(`tabView_${t}`);
+        if (btn) {
+            if (t === tabName) {
+                btn.className = 'py-2 px-4 rounded-xl font-black text-xs bg-emerald-600 text-white shadow-md transition flex items-center gap-2';
+            } else {
+                btn.className = 'py-2 px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2';
+            }
+        }
+        if (view) {
+            view.classList.toggle('hidden', t !== tabName);
+        }
+    });
+
+    renderCurrentTab();
+}
+
+function renderCurrentTab() {
+    if (currentAdminTab === 'logs') {
+        renderLogsTable();
+    } else if (currentAdminTab === 'learners') {
+        renderLearnersTable();
+    } else if (currentAdminTab === 'analytics') {
+        renderAnalyticsView();
+    } else if (currentAdminTab === 'settings') {
+        renderAdminSettings();
+    }
+}
+
+// =====================================================================
+// 5. ACTIVITY LOGS TAB
+// =====================================================================
+
+function renderLogsTable() {
+    const tbody = document.getElementById('adminLogsTbody');
+    const countEl = document.getElementById('adminLogsCount');
+    if (!tbody) return;
+
+    let filtered = cachedLogs.filter(log => {
+        if (logFilterAction !== 'all' && log.action !== logFilterAction) return false;
+        if (logFilterProvider !== 'all' && (log.provider || '').toLowerCase() !== logFilterProvider) return false;
+        if (logSearchQuery) {
+            const q = logSearchQuery.toLowerCase();
+            const nameMatch = (log.userName || '').toLowerCase().includes(q);
+            const emailMatch = (log.email || '').toLowerCase().includes(q);
+            const deviceMatch = (log.device || '').toLowerCase().includes(q);
+            if (!nameMatch && !emailMatch && !deviceMatch) return false;
+        }
+        return true;
+    });
+
+    if (countEl) countEl.textContent = `${filtered.length} entries`;
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="py-12 text-center text-slate-500 text-xs">
+                    <div class="text-2xl mb-2">🔍</div>
+                    No log events match your current filters.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(log => {
+        const timeAgo = formatTimeAgo(log.timestamp);
+        const fullTime = new Date(log.timestamp).toLocaleString();
+        const actionBadge = getActionBadge(log.action);
+        const providerBadge = getProviderBadge(log.provider);
+        const userAvatar = getUserAvatarHtml(log.userName, log.email);
+
+        return `
+            <tr class="border-b border-slate-800/60 hover:bg-slate-800/30 transition text-xs">
+                <td class="py-3 px-4">
+                    <div class="flex items-center gap-2.5">
+                        ${userAvatar}
+                        <div>
+                            <div class="font-extrabold text-white">${escapeHtml(log.userName || 'Learner')}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(log.email || 'No email (Device ID)')}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="py-3 px-4">${actionBadge}</td>
+                <td class="py-3 px-4">${providerBadge}</td>
+                <td class="py-3 px-4">
+                    <div class="flex items-center gap-1.5 font-bold">
+                        <span class="text-amber-400">Lv.${log.level || 1}</span>
+                        <span class="text-slate-500">•</span>
+                        <span class="text-emerald-400">${log.xp || 0} XP</span>
+                    </div>
+                </td>
+                <td class="py-3 px-4 text-slate-300">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800/70 text-[10px] text-slate-300 border border-slate-700/50">
+                        ${getDeviceIcon(log.device)} ${escapeHtml(log.device || 'Web Browser')}
+                    </span>
+                </td>
+                <td class="py-3 px-4 text-right">
+                    <div class="font-bold text-white text-[11px]">${timeAgo}</div>
+                    <div class="text-[9px] text-slate-500 font-mono" title="${fullTime}">${fullTime}</div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function handleLogActionFilterChange(val) {
+    logFilterAction = val;
+    renderLogsTable();
+}
+
+function handleLogProviderFilterChange(val) {
+    logFilterProvider = val;
+    renderLogsTable();
+}
+
+function handleLogSearchInput(val) {
+    logSearchQuery = val.trim();
+    renderLogsTable();
+}
+
+// =====================================================================
+// 6. LEARNERS ROSTER TAB
+// =====================================================================
+
+function renderLearnersTable() {
+    const tbody = document.getElementById('adminLearnersTbody');
+    const countEl = document.getElementById('adminLearnersCount');
+    if (!tbody) return;
+
+    let filtered = cachedLearners.filter(user => {
+        if (learnerSearchQuery) {
+            const q = learnerSearchQuery.toLowerCase();
+            const nameMatch = (user.userName || '').toLowerCase().includes(q);
+            const emailMatch = (user.email || '').toLowerCase().includes(q);
+            if (!nameMatch && !emailMatch) return false;
+        }
+        return true;
+    });
+
+    if (countEl) countEl.textContent = `${filtered.length} learners`;
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="py-12 text-center text-slate-500 text-xs">
+                    <div class="text-2xl mb-2">👤</div>
+                    No registered learners found matching "${escapeHtml(learnerSearchQuery)}".
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(user => {
+        const timeAgo = formatTimeAgo(user.lastActive);
+        const providerBadge = getProviderBadge(user.provider);
+        const userAvatar = getUserAvatarHtml(user.userName, user.email);
+        const levelPct = Math.min(100, Math.round(((Number(user.level) || 1) / 21) * 100));
+
+        return `
+            <tr class="border-b border-slate-800/60 hover:bg-slate-800/30 transition text-xs">
+                <td class="py-3 px-4">
+                    <div class="flex items-center gap-2.5">
+                        ${userAvatar}
+                        <div>
+                            <div class="font-extrabold text-white text-sm">${escapeHtml(user.userName || 'Learner')}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(user.email || 'Local User ID: ' + (user.userId || '—'))}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="py-3 px-4">${providerBadge}</td>
+                <td class="py-3 px-4">
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between font-bold text-[11px]">
+                            <span class="text-amber-300">Level ${user.level || 1} / 21</span>
+                            <span class="text-slate-400">${levelPct}%</span>
+                        </div>
+                        <div class="w-28 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-emerald-500 to-amber-400 rounded-full" style="width: ${levelPct}%"></div>
+                        </div>
+                    </div>
+                </td>
+                <td class="py-3 px-4">
+                    <span class="font-black text-emerald-400 text-sm">${(Number(user.xp) || 0).toLocaleString()}</span>
+                    <span class="text-[10px] text-slate-400 font-bold ml-1">XP</span>
+                </td>
+                <td class="py-3 px-4 text-slate-300 text-[11px]">
+                    <div class="font-bold text-white">${timeAgo}</div>
+                    <div class="text-[9px] text-slate-500">${escapeHtml(user.device || 'Web')}</div>
+                </td>
+                <td class="py-3 px-4 text-right">
+                    <button onclick="inspectLearnerDetail('${escapeAttr(user.userId || user.email)}')" class="px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-bold text-[10px] transition active:scale-95">
+                        Inspect
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function handleLearnerSearchInput(val) {
+    learnerSearchQuery = val.trim();
+    renderLearnersTable();
+}
+
+function inspectLearnerDetail(key) {
+    const user = cachedLearners.find(u => (u.userId === key || u.email === key));
+    if (!user) return;
+
+    const modal = document.getElementById('adminDetailModal');
+    const content = document.getElementById('adminDetailModalContent');
+    if (!modal || !content) return;
+
+    const userAvatar = getUserAvatarHtml(user.userName, user.email, 'w-16 h-16 text-2xl');
+    const levelPct = Math.min(100, Math.round(((Number(user.level) || 1) / 21) * 100));
+
+    content.innerHTML = `
+        <div class="flex items-center gap-4 border-b border-slate-800 pb-4">
+            ${userAvatar}
+            <div>
+                <h3 class="text-lg font-black text-white">${escapeHtml(user.userName || 'Learner')}</h3>
+                <p class="text-xs text-slate-400 font-mono">${escapeHtml(user.email || 'Local User ID: ' + (user.userId || '—'))}</p>
+                <div class="mt-1 flex items-center gap-2">
+                    ${getProviderBadge(user.provider)}
+                    <span class="text-[10px] text-slate-400">Last active: ${formatTimeAgo(user.lastActive)}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 py-4">
+            <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800">
+                <div class="text-[10px] font-bold text-slate-400 uppercase">Unlocked Mountain Level</div>
+                <div class="text-xl font-black text-amber-300 mt-1">Level ${user.level || 1} <span class="text-xs text-slate-400">/ 21</span></div>
+                <div class="w-full h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden">
+                    <div class="h-full bg-amber-400" style="width: ${levelPct}%"></div>
+                </div>
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800">
+                <div class="text-[10px] font-bold text-slate-400 uppercase">Total XP Accumulated</div>
+                <div class="text-xl font-black text-emerald-400 mt-1">${(Number(user.xp) || 0).toLocaleString()} <span class="text-xs text-slate-400">XP</span></div>
+                <div class="text-[10px] text-slate-500 mt-1">Trail Mastery Rank</div>
+            </div>
+        </div>
+
+        <div class="space-y-2 border-t border-slate-800 pt-3">
+            <h4 class="text-xs font-bold text-slate-300">Recent User Telemetry</h4>
+            <div class="text-[11px] space-y-1 text-slate-400">
+                <div><strong class="text-slate-300">Device:</strong> ${escapeHtml(user.device || 'Web Browser')}</div>
+                <div><strong class="text-slate-300">Last Action:</strong> ${escapeHtml(user.lastAction || 'login')}</div>
+                <div><strong class="text-slate-300">Account ID:</strong> <span class="font-mono text-[10px] text-slate-500">${escapeHtml(user.userId || 'local')}</span></div>
+            </div>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+}
+
+function closeAdminDetailModal() {
+    const modal = document.getElementById('adminDetailModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// =====================================================================
+// 7. ANALYTICS & VISUAL CHARTS TAB
+// =====================================================================
+
+function renderAnalyticsView() {
+    const total = Math.max(cachedLearners.length, 1);
+
+    // 1. Providers breakdown
+    let googleCount = 0;
+    let emailCount = 0;
+    let localCount = 0;
+
+    cachedLearners.forEach(u => {
+        const p = (u.provider || '').toLowerCase();
+        if (p.includes('google')) googleCount++;
+        else if (p.includes('email')) emailCount++;
+        else localCount++;
+    });
+
+    const googlePct = Math.round((googleCount / total) * 100);
+    const emailPct = Math.round((emailCount / total) * 100);
+    const localPct = Math.round((localCount / total) * 100);
+
+    // 2. Level distribution
+    let lvl1_5 = 0;   // Beginners
+    let lvl6_13 = 0;  // Intermediate
+    let lvl14_20 = 0; // Chuk-sak Half Letters
+    let lvl21 = 0;    // Mountain Champions
+
+    cachedLearners.forEach(u => {
+        const l = Number(u.level) || 1;
+        if (l >= 21) lvl21++;
+        else if (l >= 14) lvl14_20++;
+        else if (l >= 6) lvl6_13++;
+        else lvl1_5++;
+    });
+
+    // 3. Platform Breakdown
+    let apkCount = 0;
+    let mobileWebCount = 0;
+    let desktopCount = 0;
+
+    cachedLogs.forEach(l => {
+        const d = (l.device || '').toLowerCase();
+        if (d.includes('apk')) apkCount++;
+        else if (d.includes('mobile') || d.includes('ios') || d.includes('android')) mobileWebCount++;
+        else desktopCount++;
+    });
+    const logTotal = Math.max(cachedLogs.length, 1);
+    const apkPct = Math.round((apkCount / logTotal) * 100);
+    const mobPct = Math.round((mobileWebCount / logTotal) * 100);
+    const deskPct = Math.round((desktopCount / logTotal) * 100);
+
+    const container = document.getElementById('analyticsChartsContainer');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Chart 1: Sign-In Providers -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-extrabold text-sm text-white">Authentication Providers</h4>
+                        <p class="text-[10px] text-slate-400">Distribution of registered learners by sign-in method</p>
+                    </div>
+                    <span class="text-xl">🔐</span>
+                </div>
+                <!-- Stacked Progress Bar -->
+                <div class="h-3 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                    <div class="h-full bg-blue-500" style="width: ${googlePct}%" title="Google: ${googlePct}%"></div>
+                    <div class="h-full bg-emerald-500" style="width: ${emailPct}%" title="Email: ${emailPct}%"></div>
+                    <div class="h-full bg-amber-500" style="width: ${localPct}%" title="Local/Guest: ${localPct}%"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-center pt-2">
+                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
+                        <div class="text-[10px] font-bold text-blue-400">🌐 Google</div>
+                        <div class="text-base font-black text-white mt-0.5">${googleCount}</div>
+                        <div class="text-[9px] text-slate-500">${googlePct}%</div>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
+                        <div class="text-[10px] font-bold text-emerald-400">✉️ Email</div>
+                        <div class="text-base font-black text-white mt-0.5">${emailCount}</div>
+                        <div class="text-[9px] text-slate-500">${emailPct}%</div>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
+                        <div class="text-[10px] font-bold text-amber-400">📱 Local / Guest</div>
+                        <div class="text-base font-black text-white mt-0.5">${localCount}</div>
+                        <div class="text-[9px] text-slate-500">${localPct}%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart 2: Platform & Device Usage -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-extrabold text-sm text-white">Client Platforms</h4>
+                        <p class="text-[10px] text-slate-400">Device environment used to access Yakthung Pan</p>
+                    </div>
+                    <span class="text-xl">📲</span>
+                </div>
+                <!-- Stacked Progress Bar -->
+                <div class="h-3 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                    <div class="h-full bg-emerald-500" style="width: ${apkPct}%" title="Android APK: ${apkPct}%"></div>
+                    <div class="h-full bg-indigo-500" style="width: ${mobPct}%" title="Mobile Web: ${mobPct}%"></div>
+                    <div class="h-full bg-slate-400" style="width: ${deskPct}%" title="Desktop: ${deskPct}%"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-center pt-2">
+                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
+                        <div class="text-[10px] font-bold text-emerald-400">🤖 Android APK</div>
+                        <div class="text-base font-black text-white mt-0.5">${apkCount}</div>
+                        <div class="text-[9px] text-slate-500">${apkPct}%</div>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
+                        <div class="text-[10px] font-bold text-indigo-400">📱 Mobile Web</div>
+                        <div class="text-base font-black text-white mt-0.5">${mobileWebCount}</div>
+                        <div class="text-[9px] text-slate-500">${mobPct}%</div>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
+                        <div class="text-[10px] font-bold text-slate-300">💻 Desktop</div>
+                        <div class="text-base font-black text-white mt-0.5">${desktopCount}</div>
+                        <div class="text-[9px] text-slate-500">${deskPct}%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart 3: Level Progression Breakdown -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 md:col-span-2 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-extrabold text-sm text-white">Learner Trail Milestones</h4>
+                        <p class="text-[10px] text-slate-400">How far learners have progressed through the 21 Mountain Levels</p>
+                    </div>
+                    <span class="text-xl">🏔️</span>
+                </div>
+                <div class="space-y-3 pt-2">
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold mb-1">
+                            <span class="text-emerald-400">Levels 1-5 (Foundations & Consonants)</span>
+                            <span class="text-white">${lvl1_5} learners (${Math.round((lvl1_5/total)*100)}%)</span>
+                        </div>
+                        <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-emerald-500 rounded-full" style="width: ${Math.round((lvl1_5/total)*100)}%"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold mb-1">
+                            <span class="text-teal-400">Levels 6-13 (Vowels, Matras & Words)</span>
+                            <span class="text-white">${lvl6_13} learners (${Math.round((lvl6_13/total)*100)}%)</span>
+                        </div>
+                        <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-teal-500 rounded-full" style="width: ${Math.round((lvl6_13/total)*100)}%"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold mb-1">
+                            <span class="text-amber-400">Levels 14-20 (Chuk-sak Half Letters & Suffixes)</span>
+                            <span class="text-white">${lvl14_20} learners (${Math.round((lvl14_20/total)*100)}%)</span>
+                        </div>
+                        <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-amber-500 rounded-full" style="width: ${Math.round((lvl14_20/total)*100)}%"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold mb-1">
+                            <span class="text-purple-400">Level 21 (Limbu Grand Summit Master)</span>
+                            <span class="text-white">${lvl21} learners (${Math.round((lvl21/total)*100)}%)</span>
+                        </div>
+                        <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-purple-500 rounded-full" style="width: ${Math.round((lvl21/total)*100)}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// =====================================================================
+// 8. ADMIN SETTINGS TAB
+// =====================================================================
+
+function renderAdminSettings() {
+    const listEl = document.getElementById('adminEmailsList');
+    if (!listEl) return;
+
+    const emails = getAuthorizedAdminEmails();
+    listEl.innerHTML = emails.map(email => `
+        <div class="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+            <span class="font-mono text-emerald-300 font-bold">${escapeHtml(email)}</span>
+            <button onclick="removeAdminEmail('${escapeAttr(email)}')" class="text-rose-400 hover:text-rose-300 font-bold text-xs p-1">
+                ✕ Remove
+            </button>
+        </div>
+    `).join('');
+}
+
+function clearAllAdminLogs() {
+    if (!confirm('Are you sure you want to clear all stored activity telemetry logs?')) return;
+    try {
+        localStorage.removeItem('yakthung_admin_logs');
+        cachedLogs = [];
+        renderLogsTable();
+        updateKPICards();
+        showAdminToast('Telemetry logs cleared', '🧹');
+    } catch (e) {}
+}
+
+// =====================================================================
+// 9. EXPORT DATA TO CSV
+// =====================================================================
+
+function exportLogsToCSV() {
+    if (!cachedLogs || cachedLogs.length === 0) {
+        alert('No log entries to export!');
+        return;
+    }
+
+    const headers = ['Timestamp', 'Action', 'Learner_Name', 'Email', 'Provider', 'Level', 'XP', 'Device', 'Status'];
+    const rows = cachedLogs.map(l => [
+        `"${new Date(l.timestamp).toISOString()}"`,
+        `"${l.action || ''}"`,
+        `"${(l.userName || '').replace(/"/g, '""')}"`,
+        `"${(l.email || '').replace(/"/g, '""')}"`,
+        `"${l.provider || ''}"`,
+        l.level || 1,
+        l.xp || 0,
+        `"${(l.device || '').replace(/"/g, '""')}"`,
+        `"${l.status || 'success'}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    downloadBlob(csvContent, `yakthung_activity_logs_${Date.now()}.csv`, 'text/csv');
+    showAdminToast('Downloaded Activity Logs CSV', '📥');
+}
+
+function exportLearnersToCSV() {
+    if (!cachedLearners || cachedLearners.length === 0) {
+        alert('No learners to export!');
+        return;
+    }
+
+    const headers = ['User_ID', 'Learner_Name', 'Email', 'Provider', 'Current_Level', 'Total_XP', 'Last_Active', 'Device'];
+    const rows = cachedLearners.map(u => [
+        `"${u.userId || ''}"`,
+        `"${(u.userName || '').replace(/"/g, '""')}"`,
+        `"${(u.email || '').replace(/"/g, '""')}"`,
+        `"${u.provider || ''}"`,
+        u.level || 1,
+        u.xp || 0,
+        `"${new Date(u.lastActive || 0).toISOString()}"`,
+        `"${(u.device || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    downloadBlob(csvContent, `yakthung_learners_roster_${Date.now()}.csv`, 'text/csv');
+    showAdminToast('Downloaded Learners Roster CSV', '📥');
+}
+
+function downloadBlob(content, filename, contentType) {
+    const blob = new Blob([content], { type: contentType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// =====================================================================
+// 10. UI HELPERS & SAMPLE TELEMETRY
+// =====================================================================
+
+function getActionBadge(action) {
+    switch (action) {
+        case 'login':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-black">🔑 Login</span>';
+        case 'signup':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-500/40 text-[10px] font-black">✨ Sign Up</span>';
+        case 'sync':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-950/80 text-blue-300 border border-blue-500/40 text-[10px] font-black">☁️ Cloud Sync</span>';
+        case 'reset_pwd':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-500/40 text-[10px] font-black">📧 Pwd Reset</span>';
+        default:
+            return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-black">${escapeHtml(action)}</span>`;
+    }
+}
+
+function getProviderBadge(provider) {
+    const p = (provider || '').toLowerCase();
+    if (p.includes('google')) {
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/30 font-bold text-[10px]">🌐 Google</span>';
+    } else if (p.includes('email')) {
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold text-[10px]">✉️ Email</span>';
+    } else {
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold text-[10px]">📱 Local</span>';
+    }
+}
+
+function getDeviceIcon(device) {
+    const d = (device || '').toLowerCase();
+    if (d.includes('apk')) return '🤖';
+    if (d.includes('mobile') || d.includes('ios') || d.includes('android')) return '📱';
+    return '💻';
+}
+
+function getUserAvatarHtml(name, email, sizeClass = 'w-8 h-8 text-xs') {
+    const seed = encodeURIComponent(name || email || 'Learner');
+    const imgUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${seed}`;
+    return `
+        <div class="${sizeClass} rounded-full bg-slate-800 border border-emerald-500/40 overflow-hidden shrink-0 flex items-center justify-center">
+            <img src="${imgUrl}" alt="Avatar" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='👤'">
+        </div>
+    `;
+}
+
+function formatTimeAgo(isoString) {
+    if (!isoString) return 'Never';
+    const past = new Date(isoString).getTime();
+    if (isNaN(past)) return 'Recently';
+    const diffSec = Math.floor((Date.now() - past) / 1000);
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay < 30) return `${diffDay}d ago`;
+    return new Date(past).toLocaleDateString();
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[m]);
+}
+
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str).replace(/"/g, '&quot;');
+}
+
+function showAdminToast(msg, icon = '🛡️') {
+    let toast = document.getElementById('adminToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'adminToast';
+        toast.className = 'fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl bg-slate-900 border border-emerald-500/40 text-white font-bold text-xs shadow-2xl flex items-center gap-2 transform transition-all duration-300 translate-y-10 opacity-0 pointer-events-none';
+        document.body.appendChild(toast);
+    }
+    toast.innerHTML = `<span class="text-base">${icon}</span> <span>${escapeHtml(msg)}</span>`;
+    toast.classList.remove('translate-y-10', 'opacity-0');
+    setTimeout(() => {
+        toast.classList.add('translate-y-10', 'opacity-0');
+    }, 2500);
+}
+
+function generateInitialSampleLogs() {
+    const now = Date.now();
+    return [
+        {
+            id: 'act_init_1',
+            action: 'login',
+            userId: 'user_admin_demo_1',
+            userName: 'Suman Limbu',
+            email: 'suman@example.com',
+            provider: 'email',
+            timestamp: new Date(now - 1000 * 60 * 3).toISOString(),
+            device: 'Android APK',
+            level: 15,
+            xp: 2850,
+            status: 'success'
+        },
+        {
+            id: 'act_init_2',
+            action: 'signup',
+            userId: 'user_admin_demo_2',
+            userName: 'Numa Phung',
+            email: 'numa.phung@gmail.com',
+            provider: 'google',
+            timestamp: new Date(now - 1000 * 60 * 25).toISOString(),
+            device: 'Android Mobile',
+            level: 3,
+            xp: 420,
+            status: 'success'
+        },
+        {
+            id: 'act_init_3',
+            action: 'login',
+            userId: 'user_admin_demo_3',
+            userName: 'Limbu Scholar',
+            email: 'scholar@gmail.com',
+            provider: 'google',
+            timestamp: new Date(now - 1000 * 60 * 75).toISOString(),
+            device: 'Android APK',
+            level: 18,
+            xp: 3950,
+            status: 'success'
+        },
+        {
+            id: 'act_init_4',
+            action: 'sync',
+            userId: 'user_admin_demo_1',
+            userName: 'Suman Limbu',
+            email: 'suman@example.com',
+            provider: 'email',
+            timestamp: new Date(now - 1000 * 60 * 120).toISOString(),
+            device: 'Android APK',
+            level: 15,
+            xp: 2850,
+            status: 'success'
+        },
+        {
+            id: 'act_init_5',
+            action: 'login',
+            userId: 'user_admin_demo_4',
+            userName: 'Anil Mabohang',
+            email: 'anil.mabohang@yakthung.org',
+            provider: 'email',
+            timestamp: new Date(now - 1000 * 60 * 300).toISOString(),
+            device: 'Windows PC',
+            level: 9,
+            xp: 1600,
+            status: 'success'
+        }
+    ];
+}
+
+// =====================================================================
+// 11. INITIALIZATION & DASHBOARD GATE
+// =====================================================================
+
+function renderAdminDashboard() {
+    const gate = document.getElementById('adminGateOverlay');
+    const main = document.getElementById('adminMainDashboard');
+
+    if (isAdminAuthenticated()) {
+        if (gate) gate.classList.add('hidden');
+        if (main) main.classList.remove('hidden');
+        loadAllAdminData();
+
+        if (!autoRefreshTimer) {
+            autoRefreshTimer = setInterval(loadAllAdminData, 10000); // 10s live pulse
+        }
+    } else {
+        if (gate) gate.classList.remove('hidden');
+        if (main) main.classList.add('hidden');
+        const input = document.getElementById('adminPasscodeInput');
+        if (input) {
+            input.value = '';
+            setTimeout(() => input.focus(), 200);
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderAdminDashboard();
+});

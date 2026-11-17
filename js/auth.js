@@ -148,6 +148,16 @@ async function handleFirebaseAuthStateChanged(user) {
         if (typeof dismissWelcomeScreen === 'function') {
             dismissWelcomeScreen();
         }
+
+        // Record telemetry for Admin Dashboard
+        if (typeof recordAdminActivity === 'function') {
+            recordAdminActivity('login', {
+                userId: user.uid,
+                userName: profile.name,
+                email: profile.email,
+                provider: profile.provider
+            });
+        }
     } else {
         if (currentUser && !currentUser.isLocalAccount) {
             currentUser = null;
@@ -691,6 +701,14 @@ async function signUpWithEmailPassword(username = null, email = null, password =
                     await res.user.updateProfile({ displayName: chosenUsername });
                 }
                 saveLocalAccountRecord(chosenUsername, emailInput, passInput, res.user.uid);
+                if (typeof recordAdminActivity === 'function') {
+                    recordAdminActivity('signup', {
+                        userId: res.user.uid,
+                        userName: chosenUsername,
+                        email: emailInput,
+                        provider: 'email'
+                    });
+                }
                 if (typeof showToast === 'function') showToast(`Welcome, ${chosenUsername}! Account created.`, '🎉');
                 const modal = document.getElementById('authModal');
                 if (modal) modal.classList.add('hidden');
@@ -757,6 +775,9 @@ async function resetPasswordWithFirebase() {
     if (isFirebaseAvailable() && firebaseAuth) {
         try {
             await firebaseAuth.sendPasswordResetEmail(emailInput);
+            if (typeof recordAdminActivity === 'function') {
+                recordAdminActivity('reset_pwd', { email: emailInput, provider: 'email' });
+            }
             if (typeof showToast === 'function') {
                 showToast(`Password reset link sent to ${emailInput}! Check your inbox.`, '📧');
             }
@@ -799,6 +820,15 @@ function applySignedInUser(profile) {
 
     if (typeof dismissWelcomeScreen === 'function') {
         dismissWelcomeScreen();
+    }
+
+    if (typeof recordAdminActivity === 'function') {
+        recordAdminActivity('login', {
+            userId: profile.id,
+            userName: profile.name,
+            email: profile.email,
+            provider: profile.provider
+        });
     }
 }
 
@@ -873,6 +903,17 @@ async function syncCloudProgress(notify = true) {
 
     updateAuthUI();
     if (notify && typeof showToast === 'function') showToast('Progress saved & backed up ✓', '☁️');
+
+    if (typeof recordAdminActivity === 'function' && currentUser) {
+        recordAdminActivity('sync', {
+            userId: currentUser.id,
+            userName: currentUser.name,
+            email: currentUser.email,
+            provider: currentUser.provider,
+            level: (typeof progress !== 'undefined' ? (progress.unlockedLevel || 1) : 1),
+            xp: (typeof progress !== 'undefined' ? (progress.xp || 0) : 0)
+        });
+    }
 }
 
 async function signOutUser() {
@@ -1166,3 +1207,101 @@ function saveCustomFirebaseConfig() {
         }
     } catch (e) {}
 }
+
+// =====================================================================
+// Admin Telemetry & Activity Recorder
+// Records user logins, signups, and progress syncs for the Admin Dashboard
+// =====================================================================
+
+var ADMIN_LOGS_STORAGE_KEY = 'yakthung_admin_logs';
+var ADMIN_USERS_STORAGE_KEY = 'yakthung_admin_learners';
+
+function getDeviceSummary() {
+    if (typeof navigator === 'undefined') return 'Web Browser';
+    const ua = navigator.userAgent;
+    if (ua.includes('YakthungPan') || (typeof window !== 'undefined' && window.AndroidNativeGoogleAuth)) {
+        return 'Android APK';
+    } else if (/Android/i.test(ua)) {
+        return 'Android Mobile';
+    } else if (/iPhone|iPad|iPod/i.test(ua)) {
+        return 'iOS Mobile';
+    } else if (/Windows/i.test(ua)) {
+        return 'Windows PC';
+    } else if (/Mac/i.test(ua)) {
+        return 'Mac';
+    }
+    return 'Web Browser';
+}
+
+function recordAdminActivity(action, details = {}) {
+    try {
+        const u = currentUser;
+        const entry = {
+            id: 'act_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            action: action || 'login',
+            userId: details.userId || (u ? u.id : 'anonymous'),
+            userName: details.userName || (u ? (u.username || u.name) : 'Learner'),
+            email: details.email || (u ? u.email : ''),
+            provider: details.provider || (u ? u.provider : 'email'),
+            timestamp: new Date().toISOString(),
+            device: details.device || getDeviceSummary(),
+            level: details.level || (typeof progress !== 'undefined' ? (progress.unlockedLevel || 1) : 1),
+            xp: details.xp || (typeof progress !== 'undefined' ? (progress.xp || 0) : 0),
+            status: details.status || 'success'
+        };
+
+        // 1. Save to local storage for instant offline & client-side dashboard
+        let logs = [];
+        try {
+            logs = JSON.parse(localStorage.getItem(ADMIN_LOGS_STORAGE_KEY) || '[]');
+        } catch (e) {}
+        logs.unshift(entry);
+        if (logs.length > 500) logs.pop();
+        localStorage.setItem(ADMIN_LOGS_STORAGE_KEY, JSON.stringify(logs));
+
+        // 2. Update learner profile in admin roster
+        if (entry.email || entry.userId) {
+            let roster = {};
+            try {
+                roster = JSON.parse(localStorage.getItem(ADMIN_USERS_STORAGE_KEY) || '{}');
+            } catch (e) {}
+            const key = entry.email ? entry.email.toLowerCase() : entry.userId;
+            roster[key] = {
+                userId: entry.userId,
+                userName: entry.userName,
+                email: entry.email,
+                provider: entry.provider,
+                lastActive: entry.timestamp,
+                lastAction: action,
+                level: entry.level,
+                xp: entry.xp,
+                device: entry.device
+            };
+            localStorage.setItem(ADMIN_USERS_STORAGE_KEY, JSON.stringify(roster));
+        }
+
+        // 3. Save to Firebase Firestore if online
+        if (firestoreDb && !entry.userId.startsWith('demo_')) {
+            try {
+                firestoreDb.collection('admin_activity_logs').add({
+                    ...entry,
+                    serverTimestamp: window.firebase && window.firebase.firestore ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
+                }).catch(() => {});
+
+                firestoreDb.collection('users').doc(entry.userId).set({
+                    id: entry.userId,
+                    name: entry.userName,
+                    email: entry.email,
+                    provider: entry.provider,
+                    lastLogin: window.firebase && window.firebase.firestore ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString(),
+                    lastLevel: entry.level,
+                    lastXp: entry.xp,
+                    lastDevice: entry.device
+                }, { merge: true }).catch(() => {});
+            } catch (e) {}
+        }
+    } catch (err) {
+        console.warn('[Admin Telemetry] Record error:', err);
+    }
+}
+if (typeof window !== 'undefined') window.recordAdminActivity = recordAdminActivity;

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Yakthung Pan • Admin Portal & Activity Telemetry</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+                        limbu: ['"Noto Sans Limbu"', 'sans-serif']
+                    },
+                    colors: {
+                        slate: {
+                            850: '#111827',
+                            950: '#070b12'
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Limbu&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Firebase Compat SDKs for Live Firestore Telemetry -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Initialize Firebase for Admin Dashboard
+        (function() {
+            var config = {
+                apiKey: "AIzaSyCTtRZBe_CGc0k0xZzQ8KDzJEAFoN9Huo8",
+                authDomain: "yakthung-pan.firebaseapp.com",
+                projectId: "yakthung-pan",
+                storageBucket: "yakthung-pan.firebasestorage.app",
+                messagingSenderId: "923150025349",
+                appId: "1:923150025349:web:5d46d111c3f8b1ca5edfec"
+            };
+            try {
+                if (window.firebase && !window.firebase.apps.length) {
+                    window.firebase.initializeApp(config);
+                }
+            } catch (e) {
+                console.warn('[Admin Firebase] Init note:', e);
+            }
+        })();
+    </script>
+
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090e17;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body class="bg-[#070b12] text-slate-100 font-sans min-h-screen antialiased flex flex-col selection:bg-emerald-500 selection:text-white">
+
+    <!-- ========================================================= -->
+    <!-- GATE OVERLAY: ADMIN PASSCODE LOCK (SHOWN WHEN NOT AUTHENTICATED) -->
+    <!-- ========================================================= -->
+    <div id="adminGateOverlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl">
+        <div class="w-full max-w-md bg-gradient-to-b from-[#131d2e] via-[#0f1728] to-[#090e17] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
+            
+            <div class="relative w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-0.5 shadow-xl">
+                <div class="w-full h-full bg-slate-900 rounded-[22px] flex items-center justify-center">
+                    <span class="font-limbu text-3xl text-emerald-400 font-bold">ᤕ</span>
+                </div>
+                <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-xs font-black shadow-md">
+                    🛡️
+                </div>
+            </div>
+
+            <div>
+                <h1 class="text-xl font-black text-white tracking-tight">Yakthung Pan Admin Portal</h1>
+                <p class="text-xs text-slate-400 mt-1">Authorized personnel only • Telemetry & User Logins</p>
+            </div>
+
+            <form onsubmit="handleAdminLoginSubmit(event)" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">Admin Passcode</label>
+                    <div class="relative flex items-center bg-slate-950 border border-slate-700/80 rounded-2xl focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition overflow-hidden">
+                        <span class="pl-3.5 text-base text-slate-400 select-none">🔒</span>
+                        <input id="adminPasscodeInput" type="password" placeholder="Enter administrator passcode" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-sm font-medium focus:outline-none">
+                        <button type="button" onclick="const el=document.getElementById('adminPasscodeInput'); el.type = el.type==='password'?'text':'password';" class="pr-3.5 pl-2 text-sm text-slate-400 hover:text-white transition" title="Show/Hide">👁️</button>
+                    </div>
+                    <div class="flex items-center justify-between mt-1.5 px-1">
+                        <span class="text-[10px] text-slate-500">Default passcode: <code class="text-emerald-400 font-mono">yakthung2026</code></span>
+                    </div>
+                </div>
+
+                <div id="adminLoginError" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold"></div>
+
+                <button type="submit" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 active:scale-95 text-white font-extrabold text-sm shadow-lg shadow-emerald-900/30 transition cursor-pointer">
+                    Unlock Admin Dashboard →
+                </button>
+            </form>
+
+            <div class="pt-2 border-t border-white/5">
+                <a href="index.html" class="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-400 font-bold transition">
+                    ← Return to Learner App
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MAIN ADMIN DASHBOARD (SHOWN WHEN AUTHENTICATED)           -->
+    <!-- ========================================================= -->
+    <div id="adminMainDashboard" class="hidden flex-1 flex flex-col">
+        
+        <!-- TOP APP BAR -->
+        <header class="bg-slate-950/80 backdrop-blur-md border-b border-white/10 sticky top-0 z-30 px-4 sm:px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
+                    <span class="font-limbu text-xl text-white font-bold">ᤕ</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-sm sm:text-base font-black text-white leading-none">Yakthung Pan Admin</h1>
+                        <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            🛡️ Portal
+                        </span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Real-time user logins, registrations & learning progress</p>
+                </div>
+            </div>
+
+            <!-- Actions Right -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Live Connection Badge -->
+                <div class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-bold">
+                    <span id="adminConnectionDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                    <span id="adminConnectionText" class="text-slate-300">Checking...</span>
+                </div>
+
+                <!-- Back to app button -->
+                <a href="index.html" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 border border-slate-700" title="Switch to Learner View">
+                    <span>🏔️</span>
+                    <span class="hidden md:inline">Learner App</span>
+                </a>
+
+                <!-- Lock / Logout -->
+                <button onclick="logoutAdmin()" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-bold transition flex items-center gap-1.5 border border-rose-500/30 active:scale-95 cursor-pointer" title="Lock Dashboard">
+                    <span>🔒</span>
+                    <span class="hidden sm:inline">Lock</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- SUB-HEADER KPI METRICS CARDS -->
+        <div class="px-4 sm:px-6 py-4 bg-gradient-to-b from-slate-950/60 to-transparent">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                
+                <!-- KPI 1: Total Registered Learners -->
+                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1">
+                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
+                        <span>Learners</span>
+                        <span>👥</span>
+                    </div>
+                    <div id="kpiTotalUsers" class="text-2xl font-black text-white">0</div>
+                    <div class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                        <span>●</span> Registered Accounts
+                    </div>
+                </div>
+
+                <!-- KPI 2: Total Logins Tracked -->
+                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1">
+                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
+                        <span>Total Logins</span>
+                        <span>🔑</span>
+                    </div>
+                    <div id="kpiTotalLogins" class="text-2xl font-black text-emerald-400">0</div>
+                    <div class="text-[10px] text-slate-400 font-semibold">
+                        Google & Email sessions
+                    </div>
+                </div>
+
+                <!-- KPI 3: Active Learners Today -->
+                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1">
+                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
+                        <span>Active Today</span>
+                        <span>⚡</span>
+                    </div>
+                    <div id="kpiActiveToday" class="text-2xl font-black text-teal-300">0</div>
+                    <div class="text-[10px] text-slate-400 font-semibold">
+                        Within past 24 hours
+                    </div>
+                </div>
+
+                <!-- KPI 4: Total XP Accumulated -->
+                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1">
+                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
+                        <span>Total XP Earned</span>
+                        <span>🏆</span>
+                    </div>
+                    <div id="kpiTotalXp" class="text-xl sm:text-2xl font-black text-amber-300">0 XP</div>
+                    <div class="text-[10px] text-slate-400 font-semibold">
+                        All lessons & quizzes
+                    </div>
+                </div>
+
+                <!-- KPI 5: Avg Mountain Trail Level -->
+                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1 col-span-2 sm:col-span-1">
+                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
+                        <span>Avg Trail Level</span>
+                        <span>🏔️</span>
+                    </div>
+                    <div id="kpiAvgLevel" class="text-2xl font-black text-purple-300">Level 1.0</div>
+                    <div class="text-[10px] text-purple-400 font-semibold">
+                        Out of 21 Levels
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- TAB NAVIGATION BAR -->
+        <div class="px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-1.5 overflow-x-auto py-2">
+                <button id="tabBtn_logs" onclick="switchAdminTab('logs')" class="py-2 px-4 rounded-xl font-black text-xs bg-emerald-600 text-white shadow-md transition flex items-center gap-2 cursor-pointer">
+                    <span>📋</span>
+                    <span>Activity & Logins</span>
+                </button>
+                <button id="tabBtn_learners" onclick="switchAdminTab('learners')" class="py-2 px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 cursor-pointer">
+                    <span>👥</span>
+                    <span>Learners Roster</span>
+                </button>
+                <button id="tabBtn_analytics" onclick="switchAdminTab('analytics')" class="py-2 px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 cursor-pointer">
+                    <span>📊</span>
+                    <span>Visual Analytics</span>
+                </button>
+                <button id="tabBtn_settings" onclick="switchAdminTab('settings')" class="py-2 px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 cursor-pointer">
+                    <span>⚙️</span>
+                    <span>Admin Settings</span>
+                </button>
+            </div>
+
+            <!-- Global Action Bar Right -->
+            <div class="flex items-center gap-2 py-2">
+                <button onclick="loadAllAdminData()" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition active:scale-95 text-xs flex items-center gap-1 font-bold cursor-pointer" title="Refresh Live Data">
+                    <span>🔄</span>
+                    <span class="hidden sm:inline">Refresh</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="flex-1 px-4 sm:px-6 py-6 overflow-y-auto">
+
+            <!-- ===================================================== -->
+            <!-- VIEW 1: ACTIVITY & LOGINS AUDIT STREAM                -->
+            <!-- ===================================================== -->
+            <div id="tabView_logs" class="space-y-4">
+                
+                <!-- Filter & Search Toolbar -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
+                    <div class="flex items-center gap-2 flex-1">
+                        <div class="relative flex-1 max-w-sm">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 text-sm">🔍</span>
+                            <input oninput="handleLogSearchInput(this.value)" type="text" placeholder="Search learner name, email, or device..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-medium">
+                        </div>
+                        
+                        <!-- Action filter -->
+                        <select onchange="handleLogActionFilterChange(this.value)" class="bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-300 font-bold focus:outline-none focus:border-emerald-500">
+                            <option value="all">All Actions</option>
+                            <option value="login">Logins Only</option>
+                            <option value="signup">Sign Ups Only</option>
+                            <option value="sync">Cloud Sync Only</option>
+                            <option value="reset_pwd">Password Resets</option>
+                        </select>
+
+                        <!-- Provider filter -->
+                        <select onchange="handleLogProviderFilterChange(this.value)" class="bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-300 font-bold focus:outline-none focus:border-emerald-500">
+                            <option value="all">All Providers</option>
+                            <option value="google">Google</option>
+                            <option value="email">Email</option>
+                            <option value="local">Local</option>
+                        </select>
+                    </div>
+
+                    <!-- Actions Right -->
+                    <div class="flex items-center gap-2">
+                        <span id="adminLogsCount" class="text-xs font-mono text-slate-400 px-2">0 entries</span>
+                        <button onclick="exportLogsToCSV()" class="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
+                            <span>📥</span>
+                            <span>Export CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Logs Table Card -->
+                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest bg-slate-950/60">
+                                    <th class="py-3.5 px-4">Learner Profile</th>
+                                    <th class="py-3.5 px-4">Action</th>
+                                    <th class="py-3.5 px-4">Provider</th>
+                                    <th class="py-3.5 px-4">Trail Progress</th>
+                                    <th class="py-3.5 px-4">Platform / Device</th>
+                                    <th class="py-3.5 px-4 text-right">Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminLogsTbody" class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td colspan="6" class="py-12 text-center text-slate-500 text-xs">Loading activity logs...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ===================================================== -->
+            <!-- VIEW 2: LEARNERS ROSTER (USERS DIRECTORY)             -->
+            <!-- ===================================================== -->
+            <div id="tabView_learners" class="hidden space-y-4">
+                
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
+                    <div class="relative flex-1 max-w-sm">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 text-sm">🔍</span>
+                        <input oninput="handleLearnerSearchInput(this.value)" type="text" placeholder="Search learner by username or email..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-medium">
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <span id="adminLearnersCount" class="text-xs font-mono text-slate-400 px-2">0 learners</span>
+                        <button onclick="exportLearnersToCSV()" class="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
+                            <span>📥</span>
+                            <span>Export Roster CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Learners Table Card -->
+                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest bg-slate-950/60">
+                                    <th class="py-3.5 px-4">Learner</th>
+                                    <th class="py-3.5 px-4">Auth Method</th>
+                                    <th class="py-3.5 px-4">Mountain Trail Level</th>
+                                    <th class="py-3.5 px-4">Total XP</th>
+                                    <th class="py-3.5 px-4">Last Active</th>
+                                    <th class="py-3.5 px-4 text-right">Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminLearnersTbody" class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td colspan="6" class="py-12 text-center text-slate-500 text-xs">Loading learners roster...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ===================================================== -->
+            <!-- VIEW 3: VISUAL ANALYTICS                              -->
+            <!-- ===================================================== -->
+            <div id="tabView_analytics" class="hidden space-y-4">
+                <div id="analyticsChartsContainer">
+                    <div class="py-12 text-center text-slate-500 text-xs">Computing visual analytics...</div>
+                </div>
+            </div>
+
+            <!-- ===================================================== -->
+            <!-- VIEW 4: ADMIN SETTINGS & SECURITY                     -->
+            <!-- ===================================================== -->
+            <div id="tabView_settings" class="hidden space-y-6 max-w-2xl">
+                
+                <!-- Card 1: Passcode -->
+                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-black text-sm text-white">Administrator Passcode</h3>
+                            <p class="text-xs text-slate-400">Controls lockscreen access to this Admin Portal</p>
+                        </div>
+                        <button onclick="changeAdminPasscode()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition active:scale-95 cursor-pointer">
+                            🔑 Change Passcode
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card 2: Authorized Admin Emails -->
+                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-black text-sm text-white">Authorized Admin Emails</h3>
+                            <p class="text-xs text-slate-400">Users logged in with these emails auto-unlock admin access</p>
+                        </div>
+                        <button onclick="addAdminEmail()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition cursor-pointer">
+                            + Add Email
+                        </button>
+                    </div>
+
+                    <div id="adminEmailsList" class="space-y-2"></div>
+                </div>
+
+                <!-- Card 3: Danger Zone -->
+                <div class="bg-rose-950/20 border border-rose-900/40 rounded-3xl p-5 space-y-3">
+                    <div>
+                        <h3 class="font-black text-sm text-rose-300">Telemetry Maintenance</h3>
+                        <p class="text-xs text-slate-400">Reset or purge local activity telemetry storage</p>
+                    </div>
+                    <div>
+                        <button onclick="clearAllAdminLogs()" class="px-4 py-2 rounded-xl bg-rose-600/30 hover:bg-rose-600 text-rose-200 border border-rose-500/40 font-bold text-xs transition active:scale-95 cursor-pointer">
+                            🧹 Clear Local Activity Logs
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- LEARNER DETAIL MODAL                                      -->
+    <!-- ========================================================= -->
+    <div id="adminDetailModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 relative">
+            <button onclick="closeAdminDetailModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold transition">
+                ✕
+            </button>
+            <div id="adminDetailModalContent"></div>
+        </div>
+    </div>
+
+    <!-- Admin Logic Script -->
+    <script src="js/admin.js"></script>
+</body>
+</html>
