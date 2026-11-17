@@ -150,11 +150,20 @@
 
             <!-- Actions Right -->
             <div class="flex items-center gap-2 sm:gap-3">
-                <!-- Live Connection Badge -->
-                <div class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-bold">
-                    <span id="adminConnectionDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
-                    <span id="adminConnectionText" class="text-slate-300">Checking...</span>
+                <!-- Realtime Live Connection Badge -->
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-[11px] font-bold text-emerald-300">
+                    <span class="relative flex h-2 w-2">
+                        <span id="adminRealtimePing" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span id="adminRealtimeDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span id="adminConnectionText" class="tracking-wide">Realtime Cloud Live</span>
                 </div>
+
+                <!-- Sound Chime Toggle Button -->
+                <button id="adminSoundToggleBtn" onclick="toggleAdminSound()" class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Toggle audio chime on real-time logins">
+                    <span id="adminSoundIcon">🔔</span>
+                    <span id="adminSoundText" class="hidden md:inline">Chime On</span>
+                </button>
 
                 <!-- Back to app button -->
                 <a href="index.html" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 border border-slate-700" title="Switch to Learner View">
@@ -260,7 +269,11 @@
 
             <!-- Global Action Bar Right -->
             <div class="flex items-center gap-2 py-2">
-                <button onclick="loadAllAdminData()" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition active:scale-95 text-xs flex items-center gap-1 font-bold cursor-pointer" title="Refresh Live Data">
+                <button onclick="simulateRealtimeLoginEvent()" class="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Simulate a real-time login to test the live stream">
+                    <span>⚡</span>
+                    <span class="hidden sm:inline">Test Live Login</span>
+                </button>
+                <button onclick="initRealtimeEngine()" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition active:scale-95 text-xs flex items-center gap-1 font-bold cursor-pointer" title="Reconnect / Refresh Stream">
                     <span>🔄</span>
                     <span class="hidden sm:inline">Refresh</span>
                 </button>

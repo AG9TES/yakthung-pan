@@ -1259,6 +1259,15 @@ function recordAdminActivity(action, details = {}) {
         if (logs.length > 500) logs.pop();
         localStorage.setItem(ADMIN_LOGS_STORAGE_KEY, JSON.stringify(logs));
 
+        // Realtime Broadcast: Immediately notify any open Admin Portal tabs/windows
+        try {
+            if (typeof BroadcastChannel !== 'undefined') {
+                const bc = new BroadcastChannel('yakthung_admin_realtime');
+                bc.postMessage({ type: 'new_activity', entry: entry });
+                bc.close();
+            }
+        } catch (e) {}
+
         // 2. Update learner profile in admin roster
         if (entry.email || entry.userId) {
             let roster = {};

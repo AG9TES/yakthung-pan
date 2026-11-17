@@ -1,12 +1,19 @@
 /**
- * Yakthung Pan • Admin Portal & Activity Telemetry Engine
- * Exclusively for administrators to monitor user logins, account registrations,
- * cloud synchronizations, and learning progress metrics.
+ * Yakthung Pan • Real-Time Admin Portal & Activity Telemetry Engine
+ * Features:
+ *  - 100% Real-time updates via Firebase Firestore `onSnapshot` listeners
+ *  - Instant sub-millisecond cross-tab broadcast via BroadcastChannel API
+ *  - Live table insertion with glowing row animation & counter incrementing
+ *  - Live Web Audio API synthesizer chime on incoming login/signup events
+ *  - Continuous relative time ticker ("Just now", "30s ago")
+ *  - Passcode lock & authorized admin emails auto-unlock
+ *  - Filterable activity stream, learner roster inspector, and CSV exports
  */
 
 var ADMIN_STORAGE_AUTH = 'yakthung_admin_auth_session';
 var ADMIN_STORAGE_PASSCODE = 'yakthung_admin_passcode';
 var ADMIN_STORAGE_EMAILS = 'yakthung_admin_emails';
+var ADMIN_STORAGE_SOUND = 'yakthung_admin_sound_enabled';
 var DEFAULT_ADMIN_PASSCODE = 'yakthung2026';
 var DEFAULT_ADMIN_EMAILS = ['admin@yakthung.com', 'ag9tes@gmail.com'];
 
@@ -17,7 +24,16 @@ var logFilterAction = 'all';
 var logFilterProvider = 'all';
 var logSearchQuery = '';
 var learnerSearchQuery = '';
-var autoRefreshTimer = null;
+
+// Real-time state
+var isSoundEnabled = true;
+var isFirstLogsSnapshot = true;
+var isFirstUsersSnapshot = true;
+var logsUnsubscribe = null;
+var usersUnsubscribe = null;
+var realtimeBroadcastChannel = null;
+var liveTimeTicker = null;
+var newEventIds = new Set();
 
 // =====================================================================
 // 1. ADMIN AUTHENTICATION & ACCESS CONTROL
@@ -28,7 +44,6 @@ function isAdminAuthenticated() {
         if (sessionStorage.getItem(ADMIN_STORAGE_AUTH) === 'true') {
             return true;
         }
-        // Auto-unlock if user is signed in as authorized admin email
         const userProfile = getCurrentUserSafe();
         if (userProfile && userProfile.email && isAuthorizedAdminEmail(userProfile.email)) {
             sessionStorage.setItem(ADMIN_STORAGE_AUTH, 'true');
@@ -89,14 +104,14 @@ function handleAdminLoginSubmit(e) {
 
 function logoutAdmin() {
     sessionStorage.removeItem(ADMIN_STORAGE_AUTH);
-    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    teardownRealtimeListeners();
     renderAdminDashboard();
     showAdminToast('Admin session locked', '🔒');
 }
 
 function changeAdminPasscode() {
     const currentPass = getStoredAdminPasscode();
-    const oldPass = prompt('Enter your current admin passcode:');
+    const oldPass = prompt('Enter current admin passcode:');
     if (oldPass === null) return;
     if (oldPass !== currentPass && oldPass !== DEFAULT_ADMIN_PASSCODE) {
         alert('Incorrect current passcode!');
@@ -141,10 +156,6 @@ function removeAdminEmail(email) {
     } catch (e) {}
 }
 
-// =====================================================================
-// 2. DATA AGGREGATION (FIRESTORE + LOCAL CACHE)
-// =====================================================================
-
 function getCurrentUserSafe() {
     try {
         const stored = localStorage.getItem('yakthung_auth_profile');
@@ -153,10 +164,460 @@ function getCurrentUserSafe() {
     return null;
 }
 
-async function loadAllAdminData() {
-    updateConnectionIndicator('loading');
+// =====================================================================
+// 2. REAL-TIME ENGINE (FIRESTORE SNAPSHOTS + BROADCASTCHANNEL + AUDIO)
+// =====================================================================
 
-    // 1. Load from LocalStorage as baseline
+function initRealtimeEngine() {
+    // 1. Sound preference restoration
+    try {
+        const storedSound = localStorage.getItem(ADMIN_STORAGE_SOUND);
+        if (storedSound !== null) {
+            isSoundEnabled = (storedSound === 'true');
+        }
+    } catch (e) {}
+    updateSoundButtonUI();
+
+    // 2. Baseline local load
+    loadInitialBaselineData();
+
+    // 3. Connect Firestore Realtime `onSnapshot` listeners
+    setupFirestoreRealtime();
+
+    // 4. Connect Browser BroadcastChannel (Instant cross-tab realtime)
+    setupBroadcastChannelRealtime();
+
+    // 5. Connect Window Storage Event (localStorage cross-tab sync)
+    window.addEventListener('storage', handleStorageEvent);
+
+    // 6. Live Relative Timestamp Ticker (Every 10 seconds)
+    if (!liveTimeTicker) {
+        liveTimeTicker = setInterval(updateAllTimeAgoStrings, 10000);
+    }
+}
+
+function teardownRealtimeListeners() {
+    if (logsUnsubscribe) {
+        try { logsUnsubscribe(); } catch (e) {}
+        logsUnsubscribe = null;
+    }
+    if (usersUnsubscribe) {
+        try { usersUnsubscribe(); } catch (e) {}
+        usersUnsubscribe = null;
+    }
+    if (realtimeBroadcastChannel) {
+        try { realtimeBroadcastChannel.close(); } catch (e) {}
+        realtimeBroadcastChannel = null;
+    }
+    if (liveTimeTicker) {
+        clearInterval(liveTimeTicker);
+        liveTimeTicker = null;
+    }
+    window.removeEventListener('storage', handleStorageEvent);
+}
+
+function setupFirestoreRealtime() {
+    if (typeof window === 'undefined' || !window.firebase || !window.firebase.firestore) {
+        updateConnectionIndicator('local');
+        return;
+    }
+
+    try {
+        const db = window.firebase.firestore();
+        updateConnectionIndicator('connecting');
+
+        // A. Real-time Activity Logs Stream
+        if (logsUnsubscribe) logsUnsubscribe();
+        isFirstLogsSnapshot = true;
+
+        logsUnsubscribe = db.collection('admin_activity_logs')
+            .orderBy('timestamp', 'desc')
+            .limit(200)
+            .onSnapshot((snapshot) => {
+                updateConnectionIndicator('cloud');
+
+                if (isFirstLogsSnapshot) {
+                    // Initial load
+                    isFirstLogsSnapshot = false;
+                    const cloudLogs = [];
+                    snapshot.forEach(doc => {
+                        cloudLogs.push({ id: doc.id, ...doc.data() });
+                    });
+                    mergeLogsIntoCache(cloudLogs);
+                    updateKPICards();
+                    renderCurrentTab();
+                } else {
+                    // Real-time incremental additions
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const newEntry = { id: change.doc.id, ...change.doc.data() };
+                            handleIncomingRealtimeEntry(newEntry, true);
+                        }
+                    });
+                }
+            }, (err) => {
+                console.warn('[Admin Realtime] Firestore logs snapshot notice:', err);
+                updateConnectionIndicator('local');
+            });
+
+        // B. Real-time Users Roster Stream
+        if (usersUnsubscribe) usersUnsubscribe();
+        isFirstUsersSnapshot = true;
+
+        usersUnsubscribe = db.collection('users').onSnapshot((snapshot) => {
+            snapshot.docChanges().forEach(change => {
+                const data = change.doc.data();
+                const key = (data.email ? data.email.toLowerCase() : change.doc.id);
+                const updatedUser = {
+                    userId: change.doc.id,
+                    userName: data.name || data.username || 'Learner',
+                    email: data.email || '',
+                    provider: data.provider || 'cloud',
+                    lastActive: data.lastLogin ? (data.lastLogin.toDate ? data.lastLogin.toDate().toISOString() : data.lastLogin) : new Date().toISOString(),
+                    lastAction: 'login',
+                    level: data.lastLevel || 1,
+                    xp: data.lastXp || 0,
+                    device: data.lastDevice || 'Mobile App'
+                };
+
+                updateLearnerInRoster(updatedUser);
+
+                if (!isFirstUsersSnapshot && change.type === 'added') {
+                    showAdminToast(`✨ New Learner Registered: ${updatedUser.userName}!`, '🎉');
+                }
+            });
+
+            isFirstUsersSnapshot = false;
+            updateKPICards();
+            if (currentAdminTab === 'learners' || currentAdminTab === 'analytics') {
+                renderCurrentTab();
+            }
+        }, (err) => {
+            console.warn('[Admin Realtime] Firestore users snapshot notice:', err);
+        });
+
+    } catch (e) {
+        console.warn('[Admin Realtime] Setup error:', e);
+        updateConnectionIndicator('local');
+    }
+}
+
+function setupBroadcastChannelRealtime() {
+    if (typeof BroadcastChannel === 'undefined') return;
+    try {
+        if (realtimeBroadcastChannel) realtimeBroadcastChannel.close();
+        realtimeBroadcastChannel = new BroadcastChannel('yakthung_admin_realtime');
+        realtimeBroadcastChannel.onmessage = (event) => {
+            if (event && event.data && event.data.type === 'new_activity' && event.data.entry) {
+                console.log('[Admin Realtime] Instant Broadcast received:', event.data.entry);
+                handleIncomingRealtimeEntry(event.data.entry, true);
+            }
+        };
+    } catch (e) {
+        console.warn('[Admin Realtime] BroadcastChannel init note:', e);
+    }
+}
+
+function handleStorageEvent(event) {
+    if (event.key === 'yakthung_admin_logs') {
+        try {
+            const fresh = JSON.parse(event.newValue || '[]');
+            if (fresh.length > 0) {
+                mergeLogsIntoCache(fresh);
+                updateKPICards();
+                renderCurrentTab();
+            }
+        } catch (e) {}
+    }
+}
+
+/**
+ * Handles an incoming real-time activity entry from Firestore or BroadcastChannel
+ */
+function handleIncomingRealtimeEntry(entry, animate = true) {
+    if (!entry) return;
+
+    // Deduplication check
+    const entryKey = entry.id || (entry.timestamp + '_' + (entry.email || entry.userId));
+    if (newEventIds.has(entryKey)) return;
+    const exists = cachedLogs.some(l => (l.id && l.id === entry.id) || (l.timestamp === entry.timestamp && l.email === entry.email));
+    if (exists) return;
+
+    newEventIds.add(entryKey);
+
+    // Prepend to active logs cache
+    cachedLogs.unshift(entry);
+    if (cachedLogs.length > 300) cachedLogs.pop();
+
+    // Update Learner Roster cache
+    if (entry.email || entry.userId) {
+        updateLearnerInRoster({
+            userId: entry.userId,
+            userName: entry.userName,
+            email: entry.email,
+            provider: entry.provider,
+            lastActive: entry.timestamp,
+            lastAction: entry.action,
+            level: entry.level || 1,
+            xp: entry.xp || 0,
+            device: entry.device || 'Mobile App'
+        });
+    }
+
+    // Play subtle audio synthesizer chime
+    if (animate) {
+        playLiveChime();
+    }
+
+    // Live Toast notification
+    const actionLabel = (entry.action === 'signup' ? 'Registered' : (entry.action === 'sync' ? 'Synced Progress' : 'Logged In'));
+    const badgeIcon = (entry.action === 'signup' ? '✨' : (entry.action === 'sync' ? '☁️' : '🔑'));
+    showAdminToast(`${badgeIcon} Live: ${entry.userName || 'Learner'} ${actionLabel}!`, badgeIcon);
+
+    // Update KPIs instantly
+    updateKPICards();
+
+    // If currently on logs view, prepend row with green pulse highlight
+    if (currentAdminTab === 'logs') {
+        prependLogRowWithGlow(entry, entryKey);
+    } else {
+        renderCurrentTab();
+    }
+}
+
+function prependLogRowWithGlow(log, entryKey) {
+    const tbody = document.getElementById('adminLogsTbody');
+    const countEl = document.getElementById('adminLogsCount');
+    if (!tbody) return;
+
+    // Check filter match
+    if (logFilterAction !== 'all' && log.action !== logFilterAction) return;
+    if (logFilterProvider !== 'all' && (log.provider || '').toLowerCase() !== logFilterProvider) return;
+    if (logSearchQuery) {
+        const q = logSearchQuery.toLowerCase();
+        const nameMatch = (log.userName || '').toLowerCase().includes(q);
+        const emailMatch = (log.email || '').toLowerCase().includes(q);
+        if (!nameMatch && !emailMatch) return;
+    }
+
+    // Remove empty placeholder row if present
+    const emptyRow = tbody.querySelector('td[colspan="6"]');
+    if (emptyRow) tbody.innerHTML = '';
+
+    const tr = document.createElement('tr');
+    tr.id = 'row_' + entryKey;
+    tr.className = 'border-b border-slate-800/60 transition-all duration-700 text-xs bg-emerald-500/25 ring-1 ring-emerald-400';
+
+    const timeAgo = formatTimeAgo(log.timestamp);
+    const fullTime = new Date(log.timestamp).toLocaleString();
+    const actionBadge = getActionBadge(log.action);
+    const providerBadge = getProviderBadge(log.provider);
+    const userAvatar = getUserAvatarHtml(log.userName, log.email);
+
+    tr.innerHTML = `
+        <td class="py-3 px-4">
+            <div class="flex items-center gap-2.5">
+                ${userAvatar}
+                <div>
+                    <div class="font-extrabold text-white flex items-center gap-1.5">
+                        <span>${escapeHtml(log.userName || 'Learner')}</span>
+                        <span class="px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950 text-[9px] font-black uppercase tracking-wider animate-pulse">LIVE</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(log.email || 'No email (Device ID)')}</div>
+                </div>
+            </div>
+        </td>
+        <td class="py-3 px-4">${actionBadge}</td>
+        <td class="py-3 px-4">${providerBadge}</td>
+        <td class="py-3 px-4">
+            <div class="flex items-center gap-1.5 font-bold">
+                <span class="text-amber-400">Lv.${log.level || 1}</span>
+                <span class="text-slate-500">•</span>
+                <span class="text-emerald-400">${log.xp || 0} XP</span>
+            </div>
+        </td>
+        <td class="py-3 px-4 text-slate-300">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800/70 text-[10px] text-slate-300 border border-slate-700/50">
+                ${getDeviceIcon(log.device)} ${escapeHtml(log.device || 'Web Browser')}
+            </span>
+        </td>
+        <td class="py-3 px-4 text-right">
+            <div class="font-bold text-emerald-300 text-[11px] live-time-ago" data-timestamp="${log.timestamp}">Just now</div>
+            <div class="text-[9px] text-slate-500 font-mono" title="${fullTime}">${fullTime}</div>
+        </td>
+    `;
+
+    tbody.insertBefore(tr, tbody.firstChild);
+
+    // Fade out glow after 3 seconds
+    setTimeout(() => {
+        tr.className = 'border-b border-slate-800/60 hover:bg-slate-800/30 transition-all duration-700 text-xs';
+        const livePill = tr.querySelector('.animate-pulse');
+        if (livePill) livePill.remove();
+    }, 3200);
+
+    if (countEl) countEl.textContent = `${cachedLogs.length} entries`;
+}
+
+function updateLearnerInRoster(user) {
+    const key = user.email ? user.email.toLowerCase() : user.userId;
+    const existingIndex = cachedLearners.findIndex(u => (u.email && u.email.toLowerCase() === key) || u.userId === key);
+
+    if (existingIndex >= 0) {
+        cachedLearners[existingIndex] = { ...cachedLearners[existingIndex], ...user };
+    } else {
+        cachedLearners.unshift(user);
+    }
+
+    cachedLearners.sort((a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime());
+}
+
+/**
+ * Web Audio Synthesizer Chime
+ * Generates an elegant, gentle two-tone chime when a new real-time event arrives.
+ */
+function playLiveChime() {
+    if (!isSoundEnabled) return;
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') {
+            ctx.resume();
+        }
+
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, now); // D5
+        osc1.frequency.exponentialRampToValueAtTime(880.00, now + 0.15); // A5
+
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(880.00, now + 0.12);
+        osc2.frequency.exponentialRampToValueAtTime(1174.66, now + 0.3); // D6
+
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now + 0.1);
+        osc1.stop(now + 0.45);
+        osc2.stop(now + 0.45);
+    } catch (e) {}
+}
+
+function toggleAdminSound() {
+    isSoundEnabled = !isSoundEnabled;
+    try {
+        localStorage.setItem(ADMIN_STORAGE_SOUND, String(isSoundEnabled));
+    } catch (e) {}
+    updateSoundButtonUI();
+    showAdminToast(isSoundEnabled ? 'Real-time sound chime enabled' : 'Real-time sound muted', isSoundEnabled ? '🔔' : '🔕');
+    if (isSoundEnabled) playLiveChime();
+}
+
+function updateSoundButtonUI() {
+    const iconEl = document.getElementById('adminSoundIcon');
+    const textEl = document.getElementById('adminSoundText');
+    const btn = document.getElementById('adminSoundToggleBtn');
+    if (!btn) return;
+
+    if (isSoundEnabled) {
+        if (iconEl) iconEl.textContent = '🔔';
+        if (textEl) textEl.textContent = 'Chime On';
+        btn.className = 'p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer';
+    } else {
+        if (iconEl) iconEl.textContent = '🔕';
+        if (textEl) textEl.textContent = 'Muted';
+        btn.className = 'p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer';
+    }
+}
+
+function updateConnectionIndicator(status) {
+    const ping = document.getElementById('adminRealtimePing');
+    const dot = document.getElementById('adminRealtimeDot');
+    const text = document.getElementById('adminConnectionText');
+    if (!text) return;
+
+    if (status === 'cloud') {
+        if (ping) ping.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+        if (dot) dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
+        text.textContent = 'Realtime Cloud Live';
+        text.className = 'tracking-wide text-emerald-300 font-bold';
+    } else if (status === 'local') {
+        if (ping) ping.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-50';
+        if (dot) dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-teal-500';
+        text.textContent = 'Realtime Local Stream';
+        text.className = 'tracking-wide text-teal-300 font-bold';
+    } else {
+        if (ping) ping.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75';
+        if (dot) dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-amber-500';
+        text.textContent = 'Connecting...';
+        text.className = 'tracking-wide text-amber-300 font-bold';
+    }
+}
+
+function updateAllTimeAgoStrings() {
+    const timeElements = document.querySelectorAll('.live-time-ago');
+    timeElements.forEach(el => {
+        const ts = el.getAttribute('data-timestamp');
+        if (ts) {
+            el.textContent = formatTimeAgo(ts);
+        }
+    });
+}
+
+/**
+ * Simulate a live real-time login to test the real-time engine
+ */
+function simulateRealtimeLoginEvent() {
+    const sampleNames = ['Khangsar Learner', 'Suman Limbu', 'Numa Phung', 'Menchhyayem Hero', 'Taplejung Scholar', 'Sirijanga Student'];
+    const sampleProviders = ['google', 'email', 'google', 'email'];
+    const sampleDevices = ['Android APK', 'Android Mobile', 'Windows PC', 'iOS Mobile'];
+
+    const randomName = sampleNames[Math.floor(Math.random() * sampleNames.length)];
+    const randomProvider = sampleProviders[Math.floor(Math.random() * sampleProviders.length)];
+    const randomDevice = sampleDevices[Math.floor(Math.random() * sampleDevices.length)];
+    const randomLevel = Math.floor(Math.random() * 20) + 1;
+    const randomXp = randomLevel * 220 + Math.floor(Math.random() * 80);
+    const emailPrefix = randomName.toLowerCase().replace(/\s+/g, '.');
+
+    const entry = {
+        id: 'sim_' + Date.now(),
+        action: 'login',
+        userId: 'sim_usr_' + Date.now(),
+        userName: randomName,
+        email: `${emailPrefix}@gmail.com`,
+        provider: randomProvider,
+        timestamp: new Date().toISOString(),
+        device: randomDevice,
+        level: randomLevel,
+        xp: randomXp,
+        status: 'success'
+    };
+
+    // Save and broadcast through standard engine
+    if (typeof recordAdminActivity === 'function') {
+        recordAdminActivity('login', entry);
+    } else {
+        handleIncomingRealtimeEntry(entry, true);
+    }
+
+    showAdminToast(`⚡ Simulated Real-Time Login: ${randomName}`, '⚡');
+}
+
+// =====================================================================
+// 3. BASELINE LOCAL DATA LOADING
+// =====================================================================
+
+function loadInitialBaselineData() {
     let localLogs = [];
     try {
         localLogs = JSON.parse(localStorage.getItem('yakthung_admin_logs') || '[]');
@@ -188,96 +649,36 @@ async function loadAllAdminData() {
         });
     } catch (e) {}
 
-    // If no logs exist yet, generate realistic initial sample logs for immediate visualization
     if (localLogs.length === 0) {
         localLogs = generateInitialSampleLogs();
         try { localStorage.setItem('yakthung_admin_logs', JSON.stringify(localLogs)); } catch (e) {}
     }
 
-    // 2. Query Firestore if available
-    let firestoreConnected = false;
-    if (typeof window !== 'undefined' && window.firebase && window.firebase.firestore) {
-        try {
-            const db = window.firebase.firestore();
-            const logsSnap = await db.collection('admin_activity_logs').orderBy('timestamp', 'desc').limit(150).get();
-            if (logsSnap && !logsSnap.empty) {
-                firestoreConnected = true;
-                const cloudLogs = [];
-                logsSnap.forEach(doc => {
-                    cloudLogs.push({ id: doc.id, ...doc.data() });
-                });
-                // Merge cloud and local logs (avoid duplicates)
-                const seenIds = new Set();
-                const merged = [];
-                [...cloudLogs, ...localLogs].forEach(item => {
-                    const key = item.id || (item.timestamp + '_' + item.email);
-                    if (!seenIds.has(key)) {
-                        seenIds.add(key);
-                        merged.push(item);
-                    }
-                });
-                localLogs = merged;
-            }
+    mergeLogsIntoCache(localLogs);
 
-            // Also load user roster from Firestore
-            const usersSnap = await db.collection('users').get();
-            if (usersSnap && !usersSnap.empty) {
-                firestoreConnected = true;
-                usersSnap.forEach(doc => {
-                    const data = doc.data();
-                    const key = (data.email ? data.email.toLowerCase() : doc.id);
-                    localLearnersMap[key] = {
-                        userId: doc.id,
-                        userName: data.name || data.username || 'Learner',
-                        email: data.email || '',
-                        provider: data.provider || 'cloud',
-                        lastActive: data.lastLogin ? (data.lastLogin.toDate ? data.lastLogin.toDate().toISOString() : data.lastLogin) : new Date().toISOString(),
-                        lastAction: 'login',
-                        level: data.lastLevel || 1,
-                        xp: data.lastXp || 0,
-                        device: data.lastDevice || 'Mobile App'
-                    };
-                });
-            }
-        } catch (e) {
-            console.warn('[Admin] Firestore query notice:', e);
-        }
-    }
-
-    // Sort logs descending by timestamp
-    localLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    cachedLogs = localLogs;
-
-    // Convert learners map to array and sort by lastActive
     cachedLearners = Object.values(localLearnersMap);
     cachedLearners.sort((a, b) => new Date(b.lastActive || 0).getTime() - new Date(a.lastActive || 0).getTime());
 
-    updateConnectionIndicator(firestoreConnected ? 'cloud' : 'local');
-
-    // Update KPIs & Render Views
     updateKPICards();
     renderCurrentTab();
 }
 
-function updateConnectionIndicator(status) {
-    const dot = document.getElementById('adminConnectionDot');
-    const text = document.getElementById('adminConnectionText');
-    if (!dot || !text) return;
-
-    if (status === 'cloud') {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
-        text.textContent = 'Cloud Live (Firestore)';
-    } else if (status === 'local') {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
-        text.textContent = 'Local Telemetry Active';
-    } else {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-400 animate-ping';
-        text.textContent = 'Connecting...';
-    }
+function mergeLogsIntoCache(newLogs) {
+    const seenIds = new Set();
+    const merged = [];
+    [...newLogs, ...cachedLogs].forEach(item => {
+        const key = item.id || (item.timestamp + '_' + item.email);
+        if (!seenIds.has(key)) {
+            seenIds.add(key);
+            merged.push(item);
+        }
+    });
+    merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    cachedLogs = merged;
 }
 
 // =====================================================================
-// 3. KPI CALCULATIONS & RENDERING
+// 4. KPI CALCULATIONS & RENDERING
 // =====================================================================
 
 function updateKPICards() {
@@ -291,7 +692,6 @@ function updateKPICards() {
     const loginLogs = cachedLogs.filter(l => l.action === 'login' || l.action === 'signup');
     const totalLoginsCount = loginLogs.length;
 
-    // Active in last 24h
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
     const activeTodayCount = cachedLearners.filter(u => {
@@ -299,7 +699,6 @@ function updateKPICards() {
         return (now - t) < oneDayMs;
     }).length;
 
-    // Cumulative XP & Average Level
     let sumXp = 0;
     let sumLevel = 0;
     cachedLearners.forEach(u => {
@@ -317,7 +716,7 @@ function updateKPICards() {
 }
 
 // =====================================================================
-// 4. TAB NAVIGATION & VIEW RENDERERS
+// 5. TAB NAVIGATION & VIEW RENDERERS
 // =====================================================================
 
 function switchAdminTab(tabName) {
@@ -354,7 +753,7 @@ function renderCurrentTab() {
 }
 
 // =====================================================================
-// 5. ACTIVITY LOGS TAB
+// 6. ACTIVITY LOGS TAB
 // =====================================================================
 
 function renderLogsTable() {
@@ -422,7 +821,7 @@ function renderLogsTable() {
                     </span>
                 </td>
                 <td class="py-3 px-4 text-right">
-                    <div class="font-bold text-white text-[11px]">${timeAgo}</div>
+                    <div class="font-bold text-white text-[11px] live-time-ago" data-timestamp="${log.timestamp}">${timeAgo}</div>
                     <div class="text-[9px] text-slate-500 font-mono" title="${fullTime}">${fullTime}</div>
                 </td>
             </tr>
@@ -446,7 +845,7 @@ function handleLogSearchInput(val) {
 }
 
 // =====================================================================
-// 6. LEARNERS ROSTER TAB
+// 7. LEARNERS ROSTER TAB
 // =====================================================================
 
 function renderLearnersTable() {
@@ -512,11 +911,11 @@ function renderLearnersTable() {
                     <span class="text-[10px] text-slate-400 font-bold ml-1">XP</span>
                 </td>
                 <td class="py-3 px-4 text-slate-300 text-[11px]">
-                    <div class="font-bold text-white">${timeAgo}</div>
+                    <div class="font-bold text-white live-time-ago" data-timestamp="${user.lastActive}">${timeAgo}</div>
                     <div class="text-[9px] text-slate-500">${escapeHtml(user.device || 'Web')}</div>
                 </td>
                 <td class="py-3 px-4 text-right">
-                    <button onclick="inspectLearnerDetail('${escapeAttr(user.userId || user.email)}')" class="px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-bold text-[10px] transition active:scale-95">
+                    <button onclick="inspectLearnerDetail('${escapeAttr(user.userId || user.email)}')" class="px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-bold text-[10px] transition active:scale-95 cursor-pointer">
                         Inspect
                     </button>
                 </td>
@@ -588,13 +987,12 @@ function closeAdminDetailModal() {
 }
 
 // =====================================================================
-// 7. ANALYTICS & VISUAL CHARTS TAB
+// 8. ANALYTICS & VISUAL CHARTS TAB
 // =====================================================================
 
 function renderAnalyticsView() {
     const total = Math.max(cachedLearners.length, 1);
 
-    // 1. Providers breakdown
     let googleCount = 0;
     let emailCount = 0;
     let localCount = 0;
@@ -610,7 +1008,6 @@ function renderAnalyticsView() {
     const emailPct = Math.round((emailCount / total) * 100);
     const localPct = Math.round((localCount / total) * 100);
 
-    // 2. Level distribution
     let lvl1_5 = 0;   // Beginners
     let lvl6_13 = 0;  // Intermediate
     let lvl14_20 = 0; // Chuk-sak Half Letters
@@ -624,7 +1021,6 @@ function renderAnalyticsView() {
         else lvl1_5++;
     });
 
-    // 3. Platform Breakdown
     let apkCount = 0;
     let mobileWebCount = 0;
     let desktopCount = 0;
@@ -645,7 +1041,6 @@ function renderAnalyticsView() {
 
     container.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Chart 1: Sign-In Providers -->
             <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
                 <div class="flex items-center justify-between">
                     <div>
@@ -654,7 +1049,6 @@ function renderAnalyticsView() {
                     </div>
                     <span class="text-xl">🔐</span>
                 </div>
-                <!-- Stacked Progress Bar -->
                 <div class="h-3 w-full bg-slate-800 rounded-full overflow-hidden flex">
                     <div class="h-full bg-blue-500" style="width: ${googlePct}%" title="Google: ${googlePct}%"></div>
                     <div class="h-full bg-emerald-500" style="width: ${emailPct}%" title="Email: ${emailPct}%"></div>
@@ -679,7 +1073,6 @@ function renderAnalyticsView() {
                 </div>
             </div>
 
-            <!-- Chart 2: Platform & Device Usage -->
             <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
                 <div class="flex items-center justify-between">
                     <div>
@@ -688,7 +1081,6 @@ function renderAnalyticsView() {
                     </div>
                     <span class="text-xl">📲</span>
                 </div>
-                <!-- Stacked Progress Bar -->
                 <div class="h-3 w-full bg-slate-800 rounded-full overflow-hidden flex">
                     <div class="h-full bg-emerald-500" style="width: ${apkPct}%" title="Android APK: ${apkPct}%"></div>
                     <div class="h-full bg-indigo-500" style="width: ${mobPct}%" title="Mobile Web: ${mobPct}%"></div>
@@ -713,7 +1105,6 @@ function renderAnalyticsView() {
                 </div>
             </div>
 
-            <!-- Chart 3: Level Progression Breakdown -->
             <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 md:col-span-2 space-y-4">
                 <div class="flex items-center justify-between">
                     <div>
@@ -769,7 +1160,7 @@ function renderAnalyticsView() {
 }
 
 // =====================================================================
-// 8. ADMIN SETTINGS TAB
+// 9. ADMIN SETTINGS TAB
 // =====================================================================
 
 function renderAdminSettings() {
@@ -780,7 +1171,7 @@ function renderAdminSettings() {
     listEl.innerHTML = emails.map(email => `
         <div class="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
             <span class="font-mono text-emerald-300 font-bold">${escapeHtml(email)}</span>
-            <button onclick="removeAdminEmail('${escapeAttr(email)}')" class="text-rose-400 hover:text-rose-300 font-bold text-xs p-1">
+            <button onclick="removeAdminEmail('${escapeAttr(email)}')" class="text-rose-400 hover:text-rose-300 font-bold text-xs p-1 cursor-pointer">
                 ✕ Remove
             </button>
         </div>
@@ -799,7 +1190,7 @@ function clearAllAdminLogs() {
 }
 
 // =====================================================================
-// 9. EXPORT DATA TO CSV
+// 10. EXPORT DATA TO CSV
 // =====================================================================
 
 function exportLogsToCSV() {
@@ -862,7 +1253,7 @@ function downloadBlob(content, filename, contentType) {
 }
 
 // =====================================================================
-// 10. UI HELPERS & SAMPLE TELEMETRY
+// 11. UI HELPERS & SAMPLE TELEMETRY
 // =====================================================================
 
 function getActionBadge(action) {
@@ -913,7 +1304,8 @@ function formatTimeAgo(isoString) {
     const past = new Date(isoString).getTime();
     if (isNaN(past)) return 'Recently';
     const diffSec = Math.floor((Date.now() - past) / 1000);
-    if (diffSec < 60) return 'Just now';
+    if (diffSec < 15) return 'Just now';
+    if (diffSec < 60) return `${diffSec}s ago`;
     const diffMin = Math.floor(diffSec / 60);
     if (diffMin < 60) return `${diffMin}m ago`;
     const diffHour = Math.floor(diffMin / 60);
@@ -951,7 +1343,7 @@ function showAdminToast(msg, icon = '🛡️') {
     toast.classList.remove('translate-y-10', 'opacity-0');
     setTimeout(() => {
         toast.classList.add('translate-y-10', 'opacity-0');
-    }, 2500);
+    }, 2800);
 }
 
 function generateInitialSampleLogs() {
@@ -964,7 +1356,7 @@ function generateInitialSampleLogs() {
             userName: 'Suman Limbu',
             email: 'suman@example.com',
             provider: 'email',
-            timestamp: new Date(now - 1000 * 60 * 3).toISOString(),
+            timestamp: new Date(now - 1000 * 45).toISOString(),
             device: 'Android APK',
             level: 15,
             xp: 2850,
@@ -977,7 +1369,7 @@ function generateInitialSampleLogs() {
             userName: 'Numa Phung',
             email: 'numa.phung@gmail.com',
             provider: 'google',
-            timestamp: new Date(now - 1000 * 60 * 25).toISOString(),
+            timestamp: new Date(now - 1000 * 60 * 12).toISOString(),
             device: 'Android Mobile',
             level: 3,
             xp: 420,
@@ -990,43 +1382,17 @@ function generateInitialSampleLogs() {
             userName: 'Limbu Scholar',
             email: 'scholar@gmail.com',
             provider: 'google',
-            timestamp: new Date(now - 1000 * 60 * 75).toISOString(),
+            timestamp: new Date(now - 1000 * 60 * 45).toISOString(),
             device: 'Android APK',
             level: 18,
             xp: 3950,
-            status: 'success'
-        },
-        {
-            id: 'act_init_4',
-            action: 'sync',
-            userId: 'user_admin_demo_1',
-            userName: 'Suman Limbu',
-            email: 'suman@example.com',
-            provider: 'email',
-            timestamp: new Date(now - 1000 * 60 * 120).toISOString(),
-            device: 'Android APK',
-            level: 15,
-            xp: 2850,
-            status: 'success'
-        },
-        {
-            id: 'act_init_5',
-            action: 'login',
-            userId: 'user_admin_demo_4',
-            userName: 'Anil Mabohang',
-            email: 'anil.mabohang@yakthung.org',
-            provider: 'email',
-            timestamp: new Date(now - 1000 * 60 * 300).toISOString(),
-            device: 'Windows PC',
-            level: 9,
-            xp: 1600,
             status: 'success'
         }
     ];
 }
 
 // =====================================================================
-// 11. INITIALIZATION & DASHBOARD GATE
+// 12. INITIALIZATION & DASHBOARD GATE
 // =====================================================================
 
 function renderAdminDashboard() {
@@ -1036,11 +1402,7 @@ function renderAdminDashboard() {
     if (isAdminAuthenticated()) {
         if (gate) gate.classList.add('hidden');
         if (main) main.classList.remove('hidden');
-        loadAllAdminData();
-
-        if (!autoRefreshTimer) {
-            autoRefreshTimer = setInterval(loadAllAdminData, 10000); // 10s live pulse
-        }
+        initRealtimeEngine();
     } else {
         if (gate) gate.classList.remove('hidden');
         if (main) main.classList.add('hidden');
