@@ -265,9 +265,22 @@ if (typeof window !== 'undefined') {
     window.handleGoogleIdentityCredentialResponse = handleGoogleIdentityCredentialResponse;
 }
 
-// 1. Web-Based Google Authentication Flow (Pops out Web OAuth Chooser)
+// 1. Unified Google Authentication Handler (Native SDK on Android, Web GIS/OAuth on Web)
 async function handleGoogleSignInBtnClick() {
-    // Check if Google Identity Services prompt is ready
+    // A. Native Google Sign-In SDK for Android (Pops up native Google Account Picker Sheet)
+    if (typeof window !== 'undefined' && window.AndroidNativeGoogleAuth && typeof window.AndroidNativeGoogleAuth.promptNativeGoogleSignIn === 'function') {
+        if (typeof showToast === 'function') {
+            showToast('Opening Google Account Picker...', '⏳');
+        }
+        try {
+            window.AndroidNativeGoogleAuth.promptNativeGoogleSignIn();
+            return;
+        } catch (e) {
+            console.warn('[Auth] Native Google Sign-In invocation error:', e);
+        }
+    }
+
+    // B. Check if Google Identity Services (GIS) Web Prompt is ready
     if (typeof window !== 'undefined' && window.google && window.google.accounts && window.google.accounts.id) {
         try {
             window.google.accounts.id.prompt((notification) => {
@@ -282,8 +295,83 @@ async function handleGoogleSignInBtnClick() {
         }
     }
 
-    // Direct Web-Based Firebase Google OAuth (Popup Flow)
+    // C. Web-Based Firebase Google OAuth (Popup Flow)
     await signInWithGoogleFirebase();
+}
+
+/**
+ * Native Android Google Sign-In Success Callback
+ * Receives the verified Google account details directly from Google Play Services SDK.
+ */
+async function onNativeGoogleSignInSuccess(email, name, photoUrl, idToken) {
+    if (!email && !idToken) return;
+    console.log('[Auth] Native Google Sign-In success from Google Play Services:', email);
+
+    // 1. Authenticate with Firebase using official Google ID Token
+    if (isFirebaseAvailable() && firebaseAuth && idToken && window.firebase && window.firebase.auth && window.firebase.auth.GoogleAuthProvider) {
+        try {
+            const credential = window.firebase.auth.GoogleAuthProvider.credential(idToken);
+            const userCredential = await firebaseAuth.signInWithCredential(credential);
+            if (userCredential && userCredential.user) {
+                if (typeof showToast === 'function') {
+                    showToast(`Signed in as ${userCredential.user.displayName || email}!`, '✅');
+                }
+                handleFirebaseAuthStateChanged(userCredential.user);
+                return;
+            }
+        } catch (e) {
+            console.warn('[Auth] Firebase credential exchange warning:', e);
+        }
+    }
+
+    // 2. Set up learner profile from native Google Sign-In account details
+    const cleanName = name || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Yakthung Learner';
+    const profile = {
+        id: 'g_' + Math.abs(hashCode(email.toLowerCase())),
+        name: cleanName,
+        username: cleanName,
+        email: email,
+        picture: photoUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanName)}`,
+        provider: 'google',
+        isLocalAccount: true,
+        lastSynced: new Date().toISOString()
+    };
+    applySignedInUser(profile);
+    saveLocalAccountRecord(profile.name, profile.email, 'google_native_sdk', profile.id);
+    if (typeof showToast === 'function') {
+        showToast(`Welcome, ${profile.name}! Signed in with Google.`, '✅');
+    }
+    if (typeof syncCloudProgress === 'function') {
+        try { syncCloudProgress(false); } catch (e) {}
+    }
+}
+if (typeof window !== 'undefined') {
+    window.onNativeGoogleSignInSuccess = onNativeGoogleSignInSuccess;
+}
+
+/**
+ * Native Android Google Sign-In Error Callback
+ * Handles errors and cancellations from Google Play Services.
+ */
+function onNativeGoogleSignInError(statusCode) {
+    console.warn('[Auth] Native Google Sign-In error code:', statusCode);
+    if (statusCode === 12501) {
+        // User cancelled the account picker sheet
+        if (typeof showToast === 'function') showToast('Google sign-in cancelled', 'ℹ️');
+    } else if (statusCode === 10 || statusCode === 12500) {
+        // Developer configuration error (e.g. SHA-1 fingerprint not yet added in Firebase Console)
+        if (typeof showToast === 'function') {
+            showToast('Note: Add SHA-1 in Firebase Console for this app.', '⚠️');
+        }
+        promptQuickGoogleConnect();
+    } else {
+        if (typeof showToast === 'function') {
+            showToast(`Google Sign-In notice (${statusCode})`, '⚠️');
+        }
+    }
+}
+if (typeof window !== 'undefined') {
+    window.onNativeGoogleSignInError = onNativeGoogleSignInError;
 }
 
 /**

@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Yakthung Pan • ᤕᤰᤌᤢᤱ ᤐᤠᤴ</title>
+    <!-- PWA Web App Manifest and Theme Configuration -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#047857">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Yakthung Pan">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <!-- Load Local Offline Tailwind CSS -->
+    <script src="js/tailwind.js"></script>
+    <!-- Firebase App & Firebase Auth (Compat SDK v10) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+    <!-- Google Identity Services (GIS) Web-Based Auth -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Embed Noto Sans Limbu + Noto Sans Devanagari + Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@500;700&family=Noto+Sans+Limbu&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        limbu: ['"Noto Sans Limbu"', 'sans-serif'],
+                        deva: ['"Noto Sans Devanagari"', 'sans-serif'],
+                    },
+                    colors: {
+                        terracotta: {
+                            50: '#fdf4f3',
+                            100: '#fbe6e4',
+                            500: '#c84b31',
+                            600: '#a83820',
+                            700: '#8a2b17',
+                        },
+                        parchment: {
+                            50: '#fdfaf5',
+                            100: '#f7f2e8',
+                            200: '#ece3d0',
+                            300: '#dfd0b3',
+                        },
+                        slatebrand: {
+                            800: '#1e252b',
+                            900: '#0f172a',
+                        },
+                        goldaccent: {
+                            400: '#f59e0b',
+                            500: '#d97706',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Custom App Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-slate-900 text-slatebrand-900 font-sans min-h-screen flex justify-center selection:bg-emerald-600 selection:text-white">
+
+    <!-- MOBILE-FIRST APP SHELL (max-w-[460px]) -->
+    <div class="w-full max-w-[460px] bg-parchment-50 min-h-screen flex flex-col shadow-2xl relative overflow-x-hidden border-x border-slate-800">
+
+        <!-- ========================================================= -->
+        <!-- SCREEN 0: WELCOMING & LOGIN SCREEN (MATCHING POPPO STYLE)   -->
+        <!-- ========================================================= -->
+        <div id="welcomeScreen" class="fixed inset-0 z-50 flex justify-center bg-slate-950/95 backdrop-blur-md overflow-y-auto">
+            <div class="w-full max-w-[460px] bg-gradient-to-b from-slate-900 via-slate-900 to-emerald-950 min-h-screen flex flex-col justify-between p-6 text-white shadow-2xl relative border-x border-slate-800">
+                
+                <!-- Top Bar: Language on Left, Need help? on Right (Matching Image 2) -->
+                <div class="flex items-center justify-between">
+                    <button onclick="toggleLanguage()" class="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-black text-xs flex items-center gap-1 transition shadow-xs" title="Switch Language">
+                        <span id="welcomeLangFlag">🇬🇧</span>
+                        <span id="welcomeLangText">EN</span>
+                    </button>
+
+                    <button onclick="openCreditsModal()" class="text-xs text-white/80 hover:text-white font-bold transition flex items-center gap-1">
+                        <span>Need help?</span>
+                    </button>
+                </div>
+
+                <!-- Center Hero / Brand Identity (Matching Logo + Title from Image 2) -->
+                <div class="my-auto py-6 flex flex-col items-center text-center space-y-4">
+                    <!-- App Logo & Title Row -->
+                    <div class="flex items-center gap-3">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 border-2 border-goldaccent-400 flex items-center justify-center shadow-xl shrink-0">
+                            <span class="font-limbu text-3xl text-white font-bold">ᤕ</span>
+                        </div>
+                        <div class="text-left">
+                            <h1 class="text-2xl font-black text-white tracking-tight uppercase leading-none">YAKTHUNG PAN</h1>
+                            <p class="text-xs text-emerald-300 font-semibold mt-1">Master Sirijonga Script & Dialect</p>
+                        </div>
+                    </div>
+
+                    <!-- Authentic Sirijonga Script Banner -->
+                    <div class="pt-2">
+                        <div class="font-limbu text-4xl text-goldaccent-400 font-bold tracking-wide drop-shadow-md">ᤛᤣᤘᤠᤖᤥ</div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-emerald-400/90 mt-0.5">Sewaro! • Welcome</p>
+                    </div>
+                </div>
+
+                <!-- Bottom Login Actions Section (Exact layout of Image 2) -->
+                <div class="space-y-4 pb-2">
+                    
+                    <!-- State A: Not Logged In (Show the 3 Pill Login Buttons) -->
+                    <div id="welcomeLoggedOutActions" class="space-y-3">
+                        <!-- Button 1: Log in with Google (With 'Latest Login' purple floating badge) -->
+                        <button onclick="handleGoogleSignInBtnClick()" class="relative w-full py-4 px-6 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-extrabold text-sm shadow-xl flex items-center justify-center gap-3 transition cursor-pointer">
+                            <span class="absolute -top-2.5 right-6 bg-indigo-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full shadow-md uppercase tracking-wider">
+                                Latest Login
+                            </span>
+                            <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                            </svg>
+                            <span>Log in with Google</span>
+                        </button>
+
+                        <!-- Button 2: Log in with Email -->
+                        <button onclick="openAuthModalWithTab('email')" class="w-full py-4 px-6 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-extrabold text-sm shadow-xl flex items-center justify-center gap-3 transition cursor-pointer">
+                            <span class="text-lg">✉️</span>
+                            <span>Log in with Email</span>
+                        </button>
+
+                        <!-- Button 3: Create Account (Sign Up & Choose Username) -->
+                        <button onclick="openAuthModalWithTab('register')" class="w-full py-4 px-6 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-extrabold text-sm shadow-xl flex items-center justify-center gap-3 transition cursor-pointer">
+                            <span class="text-lg">✨</span>
+                            <span>Create Account (Sign Up)</span>
+                        </button>
+
+                        <!-- Button 4: Continue as Guest / Start Learning (Zero Barrier) -->
+                        <button onclick="dismissWelcomeScreen()" class="w-full py-3.5 px-6 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white font-extrabold text-xs sm:text-sm border border-white/20 shadow-md flex items-center justify-center gap-2 transition cursor-pointer">
+                            <span class="text-base">🏔️</span>
+                            <span>Continue as Guest (No Login Required)</span>
+                            <span class="text-emerald-400 font-bold">→</span>
+                        </button>
+
+                        <!-- Divider from Image 2 -->
+                        <div class="flex items-center gap-3 w-full py-1">
+                            <div class="h-px bg-white/20 flex-1"></div>
+                            <span class="text-[10px] text-white/60 font-bold uppercase tracking-wider">More Login Methods</span>
+                            <div class="h-px bg-white/20 flex-1"></div>
+                        </div>
+
+                        <!-- 3 Circular Action Icons from Image 2 -->
+                        <div class="flex items-center justify-center gap-4">
+                            <button onclick="handleGoogleSignInBtnClick()" class="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white flex items-center justify-center text-lg active:scale-95 transition" title="Google Login">
+                                <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                                    <path fill="#fff" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-2h2v2zm0-4H9V7h2v5z"/>
+                                </svg>
+                            </button>
+                            <button onclick="openAuthModalWithTab('register')" class="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white flex items-center justify-center text-lg active:scale-95 transition" title="Sign Up / Username">
+                                👤
+                            </button>
+                            <button onclick="openAuthModalWithTab('email')" class="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white flex items-center justify-center text-lg active:scale-95 transition" title="Email Login">
+                                ✉️
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- State B: Already Logged In (Show Continue Adventure) -->
+                    <div id="welcomeLoggedInActions" class="hidden space-y-3">
+                        <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 flex items-center gap-3">
+                            <div id="welcomeActiveUserImg" class="w-10 h-10 rounded-full bg-emerald-600 border border-emerald-400 flex items-center justify-center text-base font-bold text-white overflow-hidden shrink-0">
+                                👤
+                            </div>
+                            <div class="text-left flex-1 min-w-0">
+                                <p class="text-[10px] text-emerald-300 font-extrabold uppercase tracking-wider">Logged In</p>
+                                <h4 id="welcomeActiveUserName" class="text-sm font-black text-white truncate">Yakthung Learner</h4>
+                            </div>
+                        </div>
+
+                        <button id="welcomeStartBtn" onclick="dismissWelcomeScreen()" class="w-full py-4 px-6 rounded-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 active:scale-95 text-white font-black text-base shadow-2xl flex items-center justify-center gap-2 transition cursor-pointer">
+                            <span class="text-lg">🏔️</span>
+                            <span>Continue Adventure</span>
+                            <span class="text-goldaccent-300 text-base">→</span>
+                        </button>
+
+                        <button onclick="openAuthModal()" class="w-full py-2 text-xs text-white/70 hover:text-white font-bold transition">
+                            Switch Account / Manage Profile
+                        </button>
+                    </div>
+
+                    <!-- Legal / Agreement Footer from Image 2 -->
+                    <div class="text-center text-[10px] text-white/60 font-medium leading-relaxed px-4 pt-1">
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" checked class="rounded accent-emerald-500 w-3 h-3">
+                            <span>Logging in confirms you have read and agreed to</span>
+                        </label>
+                        <p class="mt-0.5">
+                            <a href="javascript:void(0)" onclick="openCreditsModal()" class="text-white underline font-bold">Yakthung Pan Terms</a> & <a href="javascript:void(0)" onclick="openCreditsModal()" class="text-white underline font-bold">Privacy Policy</a>
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- TOP HUD BAR: BRANDING, HOME, LANGUAGE, DEV, VOICE, AUTH   -->
+        <!-- ========================================================= -->
+        <header class="dhaka-header text-white px-3 py-2 flex items-center justify-between gap-1.5 border-b border-emerald-700/40 sticky top-0 z-30 shrink-0 shadow-md">
+            <!-- Left: Home Button + Brand -->
+            <div class="flex items-center gap-1.5 min-w-0">
+                <button onclick="showWelcomeScreen()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center text-sm shadow-xs active:scale-95 transition shrink-0" title="Welcome Page / Home">
+                    🏠
+                </button>
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 border border-goldaccent-400/70 flex items-center justify-center shadow shrink-0">
+                    <span class="font-limbu text-lg text-white font-bold">ᤕ</span>
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1">
+                        <h1 class="text-xs font-black tracking-tight text-white truncate" data-i18n="app_title">Yakthung Pan</h1>
+                        <span class="text-[8px] font-extrabold uppercase px-1 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40 hidden xs:inline">Phedape</span>
+                    </div>
+                    <p class="font-limbu text-[10px] text-goldaccent-400 leading-none mt-0.5 truncate">ᤕᤰᤌᤢᤱ ᤐᤠᤴ <span class="font-sans text-[9px] text-emerald-200/90 font-medium hidden sm:inline" data-i18n="app_subtitle">• Phedape Limbu</span></p>
+                </div>
+            </div>
+
+            <!-- Right Controls: Language Pill, Audio Studio, Dev Mode, Profile/Login -->
+            <div class="flex items-center gap-1 shrink-0">
+                <!-- Bilingual Toggle Pill -->
+                <button id="hudLangBtn" onclick="toggleLanguage()" class="px-2 py-1 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-black text-[10px] flex items-center gap-1 transition shadow-xs" title="Switch Language: English / नेपाली">
+                    <span id="hudLangFlag">🇬🇧</span>
+                    <span id="hudLangText">EN</span>
+                </button>
+
+                <!-- Developer Free Play Mode Pill -->
+                <button id="devModeToggleBtn" onclick="toggleDevMode()" class="px-2 py-1 rounded-xl bg-amber-500/25 hover:bg-amber-500/35 border border-amber-400/50 text-amber-300 font-extrabold text-[10px] flex items-center gap-1 transition shadow-xs" title="Developer Mode: Click to toggle free access to all 21 levels for testing">
+                    <span id="devModeIcon">🔓</span>
+                    <span id="devModeText">Dev</span>
+                </button>
+
+                <!-- Profile / Login / Logout Button in Top Right -->
+                <button onclick="openAuthModal()" class="px-2.5 py-1 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/50 text-emerald-300 font-extrabold text-[10px] flex items-center gap-1.5 shadow-xs active:scale-95 transition" title="Profile / Login / Logout">
+                    <span id="hudUserAvatar" class="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center text-[10px]">👤</span>
+                    <span id="hudUserLoginBtnText" class="max-w-[55px] truncate">Sign In</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- SUB-HUD SECONDARY BAR: STREAK, XP, MASTERED, CHART, CREDITS, SUPPORTER -->
+        <div class="bg-slate-950/90 text-white px-3 py-1.5 flex items-center justify-between border-b border-white/5 text-[10px] font-bold z-20 shrink-0">
+            <div class="flex items-center gap-2">
+                <!-- Streak Pill -->
+                <div class="flex items-center gap-1" title="Daily Streak">
+                    <span>🔥</span>
+                    <span id="hudStreak" class="text-amber-300 font-extrabold">1</span>
+                </div>
+                <span class="text-white/20">•</span>
+                <!-- XP Pill -->
+                <div class="flex items-center gap-1" title="Total XP">
+                    <span>⚡</span>
+                    <span id="hudXp" class="text-emerald-300 font-extrabold">0</span>
+                </div>
+                <span class="text-white/20">•</span>
+                <!-- Mastered Pill (X/45) -->
+                <div class="flex items-center gap-1" title="Mastered Characters">
+                    <span class="text-goldaccent-400 font-extrabold">★</span>
+                    <span id="hudMastered" class="text-white font-extrabold">0/45</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+                <!-- Interactive Chart Button -->
+                <button onclick="openChartModal()" class="px-2 py-0.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white font-extrabold text-[10px] shadow-xs active:scale-95 transition flex items-center gap-1">
+                    <span class="font-limbu text-[11px]">ᤁ</span>
+                    <span data-i18n="chart_btn">Chart</span>
+                </button>
+
+                <!-- Credits Modal Button -->
+                <button onclick="openCreditsModal()" class="px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 font-extrabold text-[10px] active:scale-95 transition flex items-center gap-1">
+                    <span>👥</span>
+                    <span data-i18n="credits_btn">Credits</span>
+                </button>
+
+                <!-- Supporter Heart Button -->
+                <button onclick="openSupporterModal()" class="w-6 h-6 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/40 text-rose-300 flex items-center justify-center text-xs font-bold active:scale-95 transition" aria-label="Support Yakthung Pan">
+                    ♥
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MAIN SCREEN: CANDY CRUSH-STYLE 17-LEVEL WINDING PATH      -->
+        <!-- ========================================================= -->
+        <main id="mapView" class="flex-1 overflow-y-auto relative">
+            <div id="windingMapContainer" class="relative w-full">
+                <!-- Dynamically populated by renderWindingMap() -->
+            </div>
+        </main>
+
+        <!-- NON-BLOCKING TOAST NOTIFICATION BANNER -->
+        <div id="toastBanner" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 -translate-y-2 w-[90%] max-w-[400px]">
+            <div class="bg-slatebrand-900/95 backdrop-blur text-parchment-50 px-4 py-2.5 rounded-2xl shadow-xl border border-goldaccent-400/50 flex items-center justify-center gap-2 text-xs font-semibold text-center">
+                <span id="toastIcon" class="text-goldaccent-400 text-base shrink-0">✦</span>
+                <span id="toastMessage">Welcome!</span>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODAL 1: 5-TAB SIRIJONGA SAK-SAK COMPLETE CHART           -->
+        <!-- ========================================================= -->
+        <div id="chartModal" class="hidden fixed inset-0 z-40 flex justify-center bg-slate-950/80 backdrop-blur-sm">
+            <div class="w-full max-w-[460px] bg-parchment-50 h-full flex flex-col shadow-2xl overflow-hidden">
+                <div class="bg-slatebrand-900 text-white px-4 py-3 flex items-center justify-between border-b border-white/10 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <span class="font-limbu text-xl text-goldaccent-400">ᤁ</span>
+                        <div>
+                            <h2 class="text-sm font-extrabold leading-none">Yakthung Sirijonga Sak-sak</h2>
+                            <p class="text-[10px] text-parchment-200 mt-0.5">Tap any character, syllable, or numeral to explore</p>
+                        </div>
+                    </div>
+                    <button onclick="closeChartModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-bold transition" aria-label="Close Chart">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- 5-Tab Bar: Consonants (25), Vowels (9), Naukhari (9-Form), Matras & Marks, Numbers (0-10) -->
+                <div class="bg-parchment-200/80 px-2.5 py-2 border-b border-parchment-300 grid grid-cols-5 gap-1 shrink-0">
+                    <button id="chartTab_consonants" onclick="switchChartTab('consonants')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-slatebrand-900 text-goldaccent-400 shadow-xs transition leading-tight">
+                        Consonants<br><span class="text-[9px] opacity-85">(25)</span>
+                    </button>
+                    <button id="chartTab_vowels" onclick="switchChartTab('vowels')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-white text-slate-700 border border-parchment-300 transition leading-tight">
+                        Vowels<br><span class="text-[9px] opacity-85">(9)</span>
+                    </button>
+                    <button id="chartTab_naukhari" onclick="switchChartTab('naukhari')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-white text-slate-700 border border-parchment-300 transition leading-tight">
+                        Naukhari<br><span class="text-[9px] opacity-85">(9-Form)</span>
+                    </button>
+                    <button id="chartTab_marks" onclick="switchChartTab('marks')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-white text-slate-700 border border-parchment-300 transition leading-tight">
+                        Matras<br><span class="text-[9px] opacity-85">& Marks</span>
+                    </button>
+                    <button id="chartTab_numbers" onclick="switchChartTab('numbers')" class="py-1.5 px-1 rounded-xl text-[10px] font-extrabold bg-white text-slate-700 border border-parchment-300 transition leading-tight">
+                        Numbers<br><span class="text-[9px] opacity-85">(0–10)</span>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-3.5 space-y-3">
+                    <div id="chartTabBody" class="space-y-3">
+                        <!-- Dynamically populated by switchChartTab() -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODAL 2: ACTIVE LESSON WORKSPACE (TRACE / QUIZ / TILES)   -->
+        <!-- ========================================================= -->
+        <div id="lessonModal" class="hidden fixed inset-0 z-40 flex justify-center bg-slate-950/80 backdrop-blur-sm">
+            <div class="w-full max-w-[460px] bg-parchment-50 h-full flex flex-col shadow-2xl overflow-hidden">
+                
+                <!-- Top Lesson Progress Header -->
+                <div class="bg-slatebrand-900 text-white px-4 py-3 flex items-center justify-between gap-3 border-b border-white/10 shrink-0">
+                    <button onclick="closeLessonModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-bold transition" aria-label="Exit Lesson">
+                        ✕
+                    </button>
+
+                    <div class="flex-1 flex flex-col gap-1">
+                        <div class="flex items-center justify-between text-[11px] font-bold">
+                            <span id="lessonHeaderTitle" class="text-goldaccent-400 truncate">Level 1 • Row 1</span>
+                            <span id="lessonStepCounter" class="text-parchment-200 shrink-0">1 / 4</span>
+                        </div>
+                        <div class="w-full h-2 bg-slatebrand-800 rounded-full overflow-hidden">
+                            <div id="lessonProgressBar" class="h-full bg-gradient-to-r from-emerald-500 to-goldaccent-400 transition-all duration-300" style="width: 25%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE A: TUNED FINGER-TRACING PAD (FITS ON SCREEN) -->
+                <!-- ================================================= -->
+                <div id="tracingWorkspace" class="hidden flex-1 overflow-hidden p-2.5 sm:p-3.5 flex flex-col justify-between gap-2">
+                    
+                    <!-- Compact Horizontal Reference Header -->
+                    <div class="bg-white rounded-2xl sm:rounded-3xl p-2 sm:p-2.5 border border-parchment-300 shadow-xs flex items-center justify-between gap-2 shrink-0">
+                        <!-- Left: Glyph + Phonetics -->
+                        <div class="flex items-center gap-2 min-w-0">
+                            <div class="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-parchment-50 border border-parchment-300 flex items-center justify-center shrink-0 shadow-inner">
+                                <span id="cardLimbuGlyph" class="font-limbu text-3xl sm:text-4xl text-slatebrand-900 leading-none">ᤁ</span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <span id="cardLatinSound" class="text-base sm:text-lg font-extrabold text-slatebrand-900 leading-none">Ka</span>
+                                    <span id="cardDevaSound" class="font-deva text-xs font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">क</span>
+                                </div>
+                                <p id="cardPhoneticHint" class="text-[10px] font-semibold text-slate-500 mt-0.5 truncate">Row 1 • Consonant</p>
+                            </div>
+                        </div>
+
+                        <!-- Center: Picture + Limbu Word Anchor -->
+                        <div class="flex items-center gap-1.5 sm:gap-2 bg-parchment-50/90 px-2 py-1 rounded-2xl border border-parchment-200 min-w-0">
+                            <span id="cardPictureEmoji" class="text-xl sm:text-2xl shrink-0">🤝</span>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1">
+                                    <span id="cardAnchorLimbu" class="font-limbu text-xs sm:text-sm font-bold text-slatebrand-900">ᤁᤠᤶ</span>
+                                    <span id="cardAnchorLatin" class="text-[11px] font-extrabold text-terracotta-600 truncate">Kam</span>
+                                </div>
+                                <p id="cardAnchorMeaning" class="text-[10px] font-semibold text-slate-500 truncate">Friend</p>
+                            </div>
+                        </div>
+
+                        <!-- Right: Listen Audio Button -->
+                        <button onclick="speakCurrentCharacter()" class="px-2.5 py-1.5 sm:py-2 rounded-2xl bg-terracotta-600 hover:bg-terracotta-700 active:scale-95 text-white shadow-xs flex flex-col items-center justify-center shrink-0 transition cursor-pointer" aria-label="Listen">
+                            <span class="text-xs sm:text-sm leading-none">🔊</span>
+                            <span class="text-[9px] font-extrabold mt-0.5">Listen</span>
+                        </button>
+                    </div>
+
+                    <!-- Responsive Tracing Canvas Card (Flexibly fills screen without scroll) -->
+                    <div class="bg-white rounded-2xl sm:rounded-3xl p-2.5 sm:p-3 border border-parchment-300 shadow-sm flex-1 min-h-0 flex flex-col justify-between gap-1.5 sm:gap-2">
+                        <div class="flex items-center justify-between gap-2 shrink-0">
+                            <span id="accuracyBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                                Accuracy: 0% (Goal: 60%)
+                            </span>
+                            <button id="ghostToggleBtn" onclick="toggleGhostMode()" class="text-[11px] font-bold px-2.5 py-1 rounded-xl border bg-parchment-50 border-parchment-300 text-slatebrand-800 flex items-center gap-1 transition">
+                                <span id="ghostIcon">👁️</span>
+                                <span id="ghostText">Ghost: Off</span>
+                            </button>
+                        </div>
+
+                        <!-- Matra & Chuk-sak Equivalence Display (Positioned cleanly directly above canvas) -->
+                        <div id="traceMatraRelationBar" class="hidden bg-amber-50/90 rounded-2xl px-3 py-1 border border-amber-200/90 shadow-2xs flex items-center justify-center gap-2 sm:gap-3 shrink-0">
+                            <span id="matraNepaliText" class="font-deva text-xs sm:text-sm font-extrabold text-amber-900 bg-amber-100/90 px-3 py-0.5 rounded-xl border border-amber-300 shadow-2xs whitespace-nowrap">ा-आकार (आ)</span>
+                            <span class="text-terracotta-600 font-extrabold text-base">➔</span>
+                            <span id="matraLimbuText" class="font-limbu text-xs sm:text-sm font-extrabold text-emerald-900 bg-emerald-100/90 px-3 py-0.5 rounded-xl border border-emerald-300 shadow-2xs flex items-center gap-1.5 whitespace-nowrap">ᤠ आम्मा</span>
+                            <button id="traceChukChartToggleBtn" onclick="toggleTraceChukChart()" type="button" class="hidden ml-1 sm:ml-2 px-2 py-0.5 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 font-extrabold text-[10px] shadow-2xs active:scale-95 transition cursor-pointer">📖 Chart</button>
+                        </div>
+
+                        <!-- Optional Chuk-sak Textbook Reference Viewer for Level 15 Tracing -->
+                        <div id="traceChukChartBox" class="hidden p-1.5 bg-white rounded-2xl border border-amber-200 shadow-inner shrink-0">
+                            <div class="flex items-center justify-between px-1 pb-1 text-[10px] text-slate-500 font-bold">
+                                <span>📖 Original Sirijonga Textbook Reference:</span>
+                                <button onclick="toggleTraceChukChart()" type="button" class="text-rose-600 hover:underline cursor-pointer">✕ Close</button>
+                            </div>
+                            <img src="img/chuk_sak_book_upright.jpg" alt="Chuk-sak Half Letters Textbook Chart" class="w-full h-auto max-h-36 object-contain rounded-lg border border-amber-100 bg-amber-50/50" />
+                        </div>
+
+                        <!-- Interactive Canvas Wrapper (Flexible min-height) -->
+                        <div id="canvasBox" class="relative w-full flex-1 min-h-[180px] sm:min-h-[240px] rounded-2xl border-2 border-dashed border-parchment-300 bg-parchment-50/40 overflow-hidden">
+                            <!-- Top overlay: Instruction bar + Live meter -->
+                            <div class="absolute top-2 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none z-10">
+                                <span class="text-[10px] font-bold text-slate-500 truncate">✍️ Trace over the dashed outline</span>
+                                <div class="px-2.5 py-0.5 rounded-full bg-white/95 border border-parchment-300 shadow-2xs flex items-center gap-1.5 shrink-0">
+                                    <div class="w-12 sm:w-14 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                        <div id="matchMeterBar" class="h-full bg-goldaccent-400 transition-all duration-150" style="width: 0%"></div>
+                                    </div>
+                                    <span id="matchMeterText" class="text-[10px] font-extrabold text-slatebrand-900">0%</span>
+                                </div>
+                            </div>
+
+                            <canvas id="tracingCanvas" class="w-full h-full block"></canvas>
+                        </div>
+
+                        <!-- Bottom Canvas Action Controls (Always in view without scrolling) -->
+                        <div class="flex items-center gap-2 pt-1 shrink-0">
+                            <button onclick="resetTracingCanvas()" class="px-4 py-3 rounded-xl font-bold text-xs bg-parchment-100 hover:bg-parchment-200 border border-parchment-300 text-slatebrand-800 active:scale-95 transition cursor-pointer">
+                                ↺ Clear
+                            </button>
+                            <button id="nextLetterBtn" onclick="advanceTraceStep()" disabled class="flex-1 py-3 px-4 rounded-xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                                <span id="nextLetterLabel">Trace 60% to Unlock</span>
+                                <span>→</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE B: BOSS RECOGNITION QUIZ (70% PASS GATE)     -->
+                <!-- ================================================= -->
+                <div id="quizWorkspace" class="hidden flex-1 overflow-hidden p-3 sm:p-4 flex flex-col justify-between gap-2.5">
+                    <div class="flex-1 overflow-y-auto min-h-0 space-y-2.5 pr-0.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <span id="quizBossBadge" class="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                                👑 Boss Script Quiz • 70% Goal
+                            </span>
+                            <span id="quizScoreTag" class="text-xs font-extrabold text-emerald-700">0/8 (0%)</span>
+                        </div>
+
+                        <!-- Live 70% Pass Threshold Progress Bar -->
+                        <div class="bg-white rounded-2xl px-3 py-2 border border-parchment-300 shadow-2xs space-y-1">
+                            <div class="flex items-center justify-between text-[10px] font-bold">
+                                <span id="quizAccuracyLabel" class="text-slate-600">Current Score: 0%</span>
+                                <span class="text-amber-700 font-extrabold">Pass Threshold: 70%</span>
+                            </div>
+                            <div class="relative w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                                <div id="quizPassFillBar" class="h-full bg-amber-400 transition-all duration-300" style="width: 0%"></div>
+                                <div class="absolute top-0 bottom-0 w-0.5 bg-slatebrand-900 z-10" style="left: 70%" title="70% Pass Goal"></div>
+                            </div>
+                        </div>
+
+                        <!-- Prompt Card (Supports Forward Script->Sound & Reverse Sound->Script) -->
+                        <div class="bg-white rounded-3xl p-3 sm:p-4 border border-parchment-300 shadow-sm text-center space-y-1.5">
+                            <p id="quizPromptSub" class="text-xs font-bold text-slate-500">Identify this Sirijonga character:</p>
+                            <div id="quizBigGlyph" class="font-limbu text-6xl sm:text-7xl text-slatebrand-900 py-1 select-none">ᤁ</div>
+                            <div id="quizReverseDeva" class="hidden font-deva text-4xl font-extrabold text-emerald-700 py-1 select-none">क</div>
+                            <div id="quizReverseHint" class="hidden text-xs font-semibold text-slate-500">Meaning: Friend (Kam)</div>
+                            <button onclick="playQuizPromptAudio()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold hover:bg-emerald-100 active:scale-95 transition">
+                                <span>🔊</span>
+                                <span>Hear Sound</span>
+                            </button>
+                        </div>
+
+                        <!-- 4 Multiple Choice Options -->
+                        <div id="quizOptionsGrid" class="grid grid-cols-2 gap-2 pt-0.5">
+                            <!-- Injected via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Feedback & Pinned Next Button -->
+                    <div class="shrink-0 space-y-1.5 pt-1">
+                        <div id="quizFeedbackBox" class="hidden p-2.5 rounded-2xl text-xs font-bold text-center"></div>
+                        <button id="quizNextBtn" onclick="advanceQuizStep()" disabled class="w-full py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition cursor-pointer">
+                            Select an Answer
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE F: BOSS QUIZ RETRY GATE (< 70% SCORE)        -->
+                <!-- ================================================= -->
+                <div id="retryWorkspace" class="hidden flex-1 flex flex-col items-center justify-center text-center p-6 space-y-5">
+                    <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-rose-500 to-amber-600 p-1 shadow-xl">
+                        <div class="w-full h-full bg-slatebrand-900 rounded-[20px] flex flex-col items-center justify-center text-white">
+                            <span id="retryScorePct" class="text-2xl font-extrabold text-rose-400">60%</span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-parchment-200 mt-0.5">Goal: 70%</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <span class="inline-block text-[11px] font-extrabold uppercase tracking-wider px-3 py-0.5 rounded-full bg-rose-100 text-rose-800">
+                            70% Mastery Required
+                        </span>
+                        <h2 class="text-2xl font-extrabold text-slatebrand-900">Almost There!</h2>
+                        <p id="retrySubText" class="text-xs text-slate-600 max-w-xs mx-auto leading-relaxed">
+                            You scored 60%. Score at least 70% on this Boss Script Quiz to unlock the next level!
+                        </p>
+                    </div>
+
+                    <div id="retryMissedBox" class="hidden w-full max-w-xs bg-white rounded-2xl p-3 border border-parchment-300 shadow-xs space-y-1.5">
+                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Review These Characters (Tap to Hear):</div>
+                        <div id="retryMissedChips" class="flex flex-wrap items-center justify-center gap-1.5"></div>
+                    </div>
+
+                    <div class="w-full max-w-xs space-y-2.5 pt-1">
+                        <button onclick="retryCurrentBossQuiz()" class="w-full py-3.5 px-6 rounded-2xl font-extrabold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slatebrand-900 shadow-lg transition active:scale-95">
+                            ↺ Try Boss Quiz Again
+                        </button>
+                        <button onclick="closeLessonModal()" class="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-parchment-200 hover:bg-parchment-300 text-slate-700 transition">
+                            Back to Adventure Map
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE C: LEVEL 17 VILLAGE GREETINGS TILE-BUILDER   -->
+                <!-- ================================================= -->
+                <div id="tileWorkspace" class="hidden flex-1 overflow-y-auto p-4 flex flex-col justify-between gap-4">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                🏔️ Village Phrase Builder
+                            </span>
+                            <button onclick="playCurrentTileAudio()" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-600 text-white shadow-xs active:scale-95 flex items-center gap-1">
+                                <span>🔊</span>
+                                <span>Listen</span>
+                            </button>
+                        </div>
+
+                        <!-- Meaning Prompt Card -->
+                        <div class="bg-white rounded-3xl p-4 border border-parchment-300 shadow-sm space-y-1.5">
+                            <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Translate into Limbu (Yakthung Pan)</span>
+                            <div class="flex items-center gap-3">
+                                <span id="tilePromptEmoji" class="text-3xl">🙏</span>
+                                <div>
+                                    <h3 id="tilePromptEnglish" class="text-base font-extrabold text-slatebrand-900">Respectful Greeting / Namaste</h3>
+                                    <p id="tilePromptNepali" class="font-deva text-xs font-semibold text-slate-600">नेपाली: नमस्कार / सेवारो</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Answer Assembly Slots -->
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Your Limbu Phrase:</span>
+                            <div id="tileAnswerTray" class="min-h-[68px] bg-white rounded-2xl p-2.5 border-2 border-dashed border-emerald-400 flex flex-wrap items-center gap-2">
+                                <span class="text-xs text-slate-400 italic">Tap tiles below to build the phrase...</span>
+                            </div>
+                        </div>
+
+                        <!-- Scrambled Word Bank -->
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Word Bank:</span>
+                            <div id="tileBankTray" class="min-h-[76px] bg-parchment-200/60 rounded-2xl p-2.5 border border-parchment-300 flex flex-wrap items-center justify-center gap-2">
+                                <!-- Scrambled tiles injected via JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Check & Continue Controls -->
+                    <div class="space-y-2">
+                        <div id="tileFeedbackBox" class="hidden p-3 rounded-2xl text-xs font-bold text-center"></div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="clearCurrentTileSelection()" class="px-4 py-3.5 rounded-2xl font-bold text-xs bg-white border border-parchment-300 text-slate-700 shadow-xs active:scale-95">
+                                ↺ Reset
+                            </button>
+                            <button id="tileActionBtn" onclick="handleTileAction()" disabled class="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition">
+                                Check Answer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE D: SAKNAM-BHAN (NAUKHARI) & MARKS BUILDER    -->
+                <!-- ================================================= -->
+                <div id="saknamWorkspace" class="hidden flex-1 overflow-hidden p-3 sm:p-4 flex flex-col justify-between gap-2.5">
+                    <div class="flex-1 overflow-y-auto min-h-0 space-y-2.5 pr-0.5">
+                        <div class="flex items-center justify-between">
+                            <span id="saknamBadge" class="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-purple-100 text-purple-900 border border-purple-300">
+                                🔤 Saknam-bhan (Naukhari)
+                            </span>
+                            <button onclick="playCurrentSaknamAudio()" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-600 text-white shadow-xs active:scale-95 flex items-center gap-1 cursor-pointer">
+                                <span>🔊</span>
+                                <span>Listen</span>
+                            </button>
+                        </div>
+
+                        <!-- Level 15 Half Letters (Chuk-sak आधा अक्षर) Reference Banner -->
+                        <div id="saknamChukSakBanner" class="hidden w-full bg-gradient-to-r from-amber-50/90 via-parchment-100 to-emerald-50/90 rounded-2xl p-2.5 border border-amber-300/80 shadow-2xs space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-amber-700 font-extrabold text-sm">✨</span>
+                                    <div>
+                                        <div class="text-[11px] font-extrabold text-amber-950 leading-tight">ᤆᤢᤰ-ᤛᤠᤰ • आधा अक्षर (7 Half Letters)</div>
+                                        <p class="text-[9px] text-amber-800 font-medium">Full Consonant ➔ Half-Letter Final Mark</p>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="toggleChukBookChart()" class="text-[10px] font-extrabold px-2 py-1 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 active:scale-95 transition shadow-2xs cursor-pointer flex items-center gap-1">
+                                    <span>📖</span>
+                                    <span id="chukBookChartToggleText">Book Chart</span>
+                                </button>
+                            </div>
+
+                            <!-- Interactive 7 Half-Letter Pills -->
+                            <div id="chukSakPillsContainer" class="grid grid-cols-4 sm:grid-cols-7 gap-1">
+                                <!-- Injected via JS -->
+                            </div>
+
+                            <!-- Collapsible Authentic Textbook Chart -->
+                            <div id="chukBookChartBox" class="hidden p-1.5 bg-white rounded-xl border border-amber-200 shadow-inner">
+                                <div class="flex items-center justify-between px-1 pb-1 text-[10px] text-slate-500 font-bold">
+                                    <span>Original Sirijonga Textbook Reference:</span>
+                                    <button onclick="toggleChukBookChart()" class="text-rose-600 hover:underline">✕ Close</button>
+                                </div>
+                                <img src="img/chuk_sak_book_upright.jpg" alt="Chuk-sak Half Letters Textbook Chart" class="w-full h-auto rounded-lg object-contain border border-slate-200">
+                            </div>
+                        </div>
+
+                        <!-- Optional Reference Banner for Extra 13.1 & 13.2 -->
+                        <div id="saknamExtraBanner" class="hidden w-full bg-parchment-100 rounded-2xl p-2.5 border border-parchment-300 shadow-2xs text-center space-y-1.5">
+                            <div class="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider flex items-center justify-center gap-1">
+                                <span>⭐</span>
+                                <span id="saknamBannerTitle">Chuk-sak Finals & Ektum/Kusek Sound Marks Reference</span>
+                                <span>⭐</span>
+                            </div>
+                            <img id="saknamBannerImg" src="img/extra_chuk_ektum.png" alt="Chuk-sak & Ektum/Kusek Reference Chart" class="w-full h-auto rounded-xl object-contain border border-parchment-200 bg-white shadow-2xs">
+                            
+                            <!-- Practice Category Switcher for Extra 13.1 / 13.2 -->
+                            <div id="saknamExtraModeBar" class="flex items-center justify-center gap-1.5 p-1 bg-white/90 rounded-xl border border-parchment-300 shadow-2xs">
+                                <button id="extraFilterAllBtn" onclick="switchExtraSaknamMode('all')" class="flex-1 py-1 px-2 rounded-lg text-[10px] font-extrabold transition bg-parchment-100 text-slate-700 hover:bg-parchment-200">
+                                    🌟 All 13
+                                </button>
+                                <button id="extraFilterFinalsBtn" onclick="switchExtraSaknamMode('finals')" class="flex-1 py-1 px-2 rounded-lg text-[10px] font-extrabold transition bg-emerald-700 text-white shadow-2xs">
+                                    ✨ 7 Finals
+                                </button>
+                                <button id="extraFilterMarksBtn" onclick="switchExtraSaknamMode('marks')" class="flex-1 py-1 px-2 rounded-lg text-[10px] font-extrabold transition bg-parchment-100 text-slate-700 hover:bg-parchment-200">
+                                    💫 6 Marks
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Target Syllable / Mark Card -->
+                        <div class="bg-white rounded-3xl p-3 sm:p-4 border border-parchment-300 shadow-sm text-center space-y-1.5">
+                            <span id="saknamInstruction" class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">
+                                Combine Consonant + Vowel Matra
+                            </span>
+
+                            <!-- Half-Letter Equation (Level 15): e.g. ᤁ (क) ➔ ᤰ (क्) -->
+                            <div id="saknamHalfLetterEquation" class="hidden flex items-center justify-center gap-2 py-1.5 px-3 bg-amber-50/80 rounded-xl border border-amber-200/90 text-xs font-bold text-slatebrand-900">
+                                <span id="eqFullConsonant" class="font-limbu text-2xl font-bold">ᤁ</span>
+                                <span class="text-terracotta-600 font-extrabold text-base">➔</span>
+                                <span id="eqHalfConsonant" class="font-limbu text-2xl font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-300 shadow-2xs">ᤰ</span>
+                                <span id="eqHalfDeva" class="text-xs font-black text-emerald-900">चुक् (क्) आधा अक्षर</span>
+                            </div>
+
+                            <div class="flex items-center justify-center gap-3 py-1">
+                                <div class="px-4 py-2 rounded-2xl bg-parchment-50 border border-parchment-300 shadow-inner">
+                                    <div id="saknamTargetDeva" class="font-deva text-3xl font-extrabold text-slatebrand-900">का</div>
+                                    <div id="saknamTargetLatin" class="text-xs font-extrabold text-emerald-700">Kaa</div>
+                                </div>
+                                <div class="text-left space-y-0.5">
+                                    <div id="saknamRuleTitle" class="text-xs font-extrabold text-slatebrand-900">Ka (ᤁ) + Amma (ᤠ)</div>
+                                    <p id="saknamRuleDesc" class="text-[11px] text-slate-600">Add the Amma matra to lengthen the vowel.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4 Syllable / Mark Choices -->
+                        <div id="saknamOptionsGrid" class="grid grid-cols-2 gap-2.5 pt-1">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Feedback & Pinned Next Button -->
+                    <div class="shrink-0 space-y-1.5 pt-1">
+                        <div id="saknamFeedbackBox" class="hidden p-2.5 rounded-2xl text-xs font-bold text-center"></div>
+                        <button id="saknamNextBtn" onclick="advanceSaknamStep()" disabled class="w-full py-3.5 px-4 rounded-2xl font-extrabold text-xs bg-slate-300 text-slate-500 cursor-not-allowed transition cursor-pointer">
+                            Select the Matching Form
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================================================= -->
+                <!-- MODE E: 3-STAR VICTORY CELEBRATION SCREEN         -->
+                <!-- ================================================= -->
+                <div id="victoryWorkspace" class="hidden flex-1 flex flex-col items-center justify-center text-center p-6 space-y-5">
+                    <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-goldaccent-400 to-emerald-600 p-1 shadow-xl">
+                        <div class="w-full h-full bg-slatebrand-900 rounded-[20px] flex flex-col items-center justify-center text-white">
+                            <span class="font-limbu text-3xl text-goldaccent-400">ᤛᤣᤘᤠᤖᤥ</span>
+                            <span class="text-[10px] font-bold uppercase tracking-widest mt-0.5 text-parchment-200">Sewaro!</span>
+                        </div>
+                    </div>
+
+                    <div id="victoryStarsDisplay" class="flex items-center justify-center gap-2 text-4xl text-goldaccent-400">
+                        <span>★</span><span>★</span><span>★</span>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-center gap-2">
+                            <span id="victoryBadgeText" class="inline-block text-[11px] font-extrabold uppercase tracking-wider px-3 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                Level Completed!
+                            </span>
+                            <span id="victoryXpPill" class="inline-block text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                                +40 XP
+                            </span>
+                        </div>
+                        <h2 id="victoryHeadline" class="text-2xl font-extrabold text-slatebrand-900">Kheni! Well Done!</h2>
+                        <p id="victorySubText" class="text-xs text-slate-600 max-w-xs mx-auto">
+                            Next stage unlocked on your Yakthung Pan adventure path.
+                        </p>
+                    </div>
+
+                    <button onclick="finishLevelAndReturn()" class="w-full max-w-xs py-3.5 px-6 rounded-2xl font-extrabold text-sm bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg transition active:scale-95">
+                        Continue on Map →
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODAL 3: NON-INTRUSIVE SUPPORTER & AUDIO STUDIO MODAL     -->
+        <!-- ========================================================= -->
+        <div id="supporterModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <div class="w-full max-w-[400px] bg-parchment-50 rounded-3xl border border-parchment-300 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="dhaka-header text-white px-4 py-3.5 flex items-center justify-between border-b border-emerald-700/50">
+                    <div class="flex items-center gap-2">
+                        <span class="text-rose-400 text-lg">♥</span>
+                        <h2 class="text-sm font-extrabold">Supporter & Audio Studio</h2>
+                    </div>
+                    <button onclick="closeSupporterModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-bold">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="p-4 overflow-y-auto space-y-4 text-xs text-slate-700">
+                                        <!-- Phedape Limbu Dialect & Community Mission -->
+                    <div class="bg-white rounded-2xl p-3.5 border border-parchment-200 space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="font-limbu text-xl text-emerald-700">ᤛᤣᤘᤠᤖᤥ</span>
+                                <h3 class="font-extrabold text-slatebrand-900 text-sm">Phedape Limbu Dialect (फेदापे)</h3>
+                            </div>
+                            <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Authentic</span>
+                        </div>
+                        <p class="leading-relaxed text-slate-600">
+                            Preserving authentic Sirijonga script and Phedape Limbu dialect (फेदापे याक्थुङ पान) spoken in historical Phedap / Eastern Nepal (Tehrathum, Sankhuwasabha). Lessons remain 100% free and ad-free.
+                        </p>
+                    </div>
+
+                    <!-- Developer Quick Level Testing & Dialect Controls -->
+                    <div class="bg-amber-50 rounded-2xl p-3 border border-amber-200 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="font-extrabold text-amber-900 text-xs flex items-center gap-1.5">
+                                <span>🛠️</span> Developer & Testing Sandbox
+                            </div>
+                            <span id="modalDevBadge" class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">Dev Active</span>
+                        </div>
+                        <p class="text-[10px] text-amber-800 leading-snug">
+                            All 21 levels are unlocked for instant testing without completing prior levels.
+                        </p>
+                        <div class="flex items-center gap-2 pt-1">
+                            <select id="devJumpSelect" onchange="jumpToSelectedLevel(this.value)" class="flex-1 text-[11px] font-bold p-1.5 rounded-xl border border-amber-300 bg-white text-slatebrand-900">
+                                <option value="">⚡ Jump to Any Level (1–21)...</option>
+                            </select>
+                            <button onclick="toggleDevMode()" class="px-2.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10px] transition shrink-0">
+                                Toggle Mode
+                            </button>
+                        </div>
+                        <button onclick="unlockAllLevelsPermanently()" class="w-full py-1.5 px-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-extrabold text-[10px] transition text-center shadow-xs flex items-center justify-center gap-1.5">
+                            <span>🔓</span> Unlock All 21 Levels in Progress (Permanent)
+                        </button>
+                    </div>
+
+                    <!-- Support Options -->
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button onclick="handleSupportAction('eSewa / Khalti ID copied: 9800000000 (Yakthung Pan)')" class="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-left space-y-1 transition active:scale-95">
+                            <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-600 text-white">Nepal Local</span>
+                            <div class="font-extrabold text-slatebrand-900 text-xs">eSewa / Khalti</div>
+                            <p class="text-[10px] text-slate-600">Tap to copy supporter ID</p>
+                        </button>
+
+                        <button onclick="handleSupportAction('Thank you! Diaspora Chiya / Ko-fi link copied.')" class="p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-left space-y-1 transition active:scale-95">
+                            <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-600 text-white">Diaspora</span>
+                            <div class="font-extrabold text-slatebrand-900 text-xs">Buy Us Chiya</div>
+                            <p class="text-[10px] text-slate-600">Support audio preservation</p>
+                        </button>
+                    </div>
+
+                                        <!-- Audio Studio Status -->
+                    <div class="bg-emerald-900/10 rounded-2xl p-3 border border-emerald-600/30 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">🎙️</span>
+                            <div>
+                                <div class="font-extrabold text-slatebrand-900 text-xs">Audio Loader Active</div>
+                                <div class="text-[10px] text-slate-600">Plays <code class="bg-parchment-200 px-1 py-0.5 rounded text-[9px]">audio/&lt;id&gt;.mp3</code> with Web Audio chime fallback</div>
+                            </div>
+                        </div>
+                        <span id="audioStudioStatusPill" class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Auto</span>
+                    </div>
+
+                    <!-- Complete Curriculum Overview -->
+                    <div class="bg-white rounded-2xl p-3 border border-parchment-200 space-y-1">
+                        <h4 class="font-extrabold text-slatebrand-900">Complete Sirijonga Sak-sak Curriculum</h4>
+                        <p class="text-[11px] text-slate-600 leading-relaxed">
+                            Covers all 25 Consonants (<span class="font-limbu font-bold">ᤁ</span>–<span class="font-limbu font-bold">ᤜ</span> + <span class="font-limbu font-bold">ᤄ</span>), 9 Kubung-sak Vowels (<span class="font-limbu font-bold">ᤀ</span>–<span class="font-limbu font-bold">ᤀᤧ</span>), 9-Form Naukhari matrix, 8 Saknam-sak Matras, Chuk-sak finals, Ektum-sak conjuncts, Kusek-sak marks, and Khanin numerals (<span class="font-limbu font-bold">᥆</span>–<span class="font-limbu font-bold">᥇᥆</span>).
+                        </p>
+                    </div>
+
+                    <!-- Progress Summary & Two-Step Reset -->
+                    <div class="pt-2 border-t border-parchment-200 flex items-center justify-between gap-2">
+                        <div class="text-[11px] text-slate-500">
+                            <span id="modalStatsSummary" class="font-bold text-slatebrand-800">0/45 Items Mastered</span>
+                        </div>
+
+                        <div id="resetConfirmGroup">
+                            <button onclick="promptResetProgress()" class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] transition">
+                                Reset Progress
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODAL 4: YAKTHUNG VOICE STUDIO (RECORDING & AUDIO UPLOAD) -->
+        <!-- ========================================================= -->
+        <div id="voiceStudioModal" class="hidden fixed inset-0 z-50 flex justify-center bg-slate-950/85 backdrop-blur-sm">
+            <div class="w-full max-w-[460px] bg-parchment-50 h-full flex flex-col shadow-2xl overflow-hidden">
+                <!-- Header -->
+                <div class="dhaka-header text-white px-4 py-3 flex items-center justify-between border-b border-white/10 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">🎙️</span>
+                        <div>
+                            <h2 class="text-sm font-extrabold leading-none" data-i18n="voice_studio_title">Yakthung Voice Studio</h2>
+                            <p class="text-[10px] text-parchment-200 mt-0.5" data-i18n="voice_studio_sub">Record authentic pronunciation for every letter & word</p>
+                        </div>
+                    </div>
+                    <button onclick="closeVoiceStudio()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-bold transition">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Main Content Body -->
+                <div class="flex-1 overflow-y-auto p-3.5 space-y-3">
+                    
+                    <!-- Direct Folder Storage & Batch Assign Banner -->
+                    <div class="bg-emerald-950 text-white rounded-2xl p-3 border border-emerald-700/50 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-extrabold text-xs text-goldaccent-300 flex items-center gap-1.5">
+                                <span>📁</span> Audio Folder & Word Assignment
+                            </span>
+                            <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-800 text-emerald-200">
+                                <span class="custom-voice-count-badge">0</span> Audio Assigned
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-emerald-100 leading-snug">
+                            Assign any audio file (<code class="bg-emerald-900/80 px-1 py-0.5 rounded text-[10px] text-goldaccent-300">.mp3</code>, <code class="bg-emerald-900/80 px-1 py-0.5 rounded text-[10px] text-goldaccent-300">.wav</code>) to each word below. Files are saved directly to your <code class="bg-emerald-900/80 px-1 py-0.5 rounded text-[10px] text-emerald-300">audio/</code> folder! You can also copy files straight into <code class="bg-emerald-900/80 px-1 py-0.5 rounded text-[10px] text-emerald-300">audio/&lt;id&gt;.mp3</code> on your computer.
+                        </p>
+                        <div class="pt-1 flex items-center gap-2">
+                            <button onclick="triggerBatchAudioUpload()" class="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs shadow-md transition flex items-center justify-center gap-1.5">
+                                <span>📁</span> <span>Batch Assign Multiple MP3s</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Active Recording Dock Card -->
+                    <div id="voiceStudioActiveDock" class="bg-white rounded-3xl p-4 border border-parchment-300 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-14 h-14 rounded-2xl bg-parchment-100 border border-parchment-300 flex items-center justify-center shadow-inner shrink-0">
+                                    <span id="dockTargetGlyph" class="font-limbu text-4xl text-slatebrand-900 leading-none">ᤁ</span>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-1.5">
+                                        <h3 id="dockTargetTitle" class="text-base font-extrabold text-slatebrand-900 leading-none">Ka</h3>
+                                        <span id="dockTargetDeva" class="font-deva text-xs font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">क</span>
+                                    </div>
+                                    <p id="dockTargetMeaning" class="text-xs text-slate-500 font-semibold mt-1">Friend / Companion</p>
+                                </div>
+                            </div>
+
+                            <span id="dockCustomActiveBadge" class="hidden text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-500 text-white shadow-xs">
+                                🎙️ Custom Voice Active
+                            </span>
+                        </div>
+
+                        <!-- Mic Recording Hub -->
+                        <div class="bg-parchment-100/80 rounded-2xl p-3.5 border border-parchment-300 flex flex-col items-center justify-center gap-2 relative">
+                            <div class="relative flex items-center justify-center">
+                                <div id="voiceStudioPulseRing" class="hidden absolute w-20 h-20 rounded-full bg-rose-500/30 animate-ping"></div>
+                                <button id="voiceStudioRecordBtn" onclick="toggleStudioRecord()" class="w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white flex items-center justify-center text-2xl shadow-lg transition z-10" title="Tap to record voice">
+                                    🎙️
+                                </button>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <span id="voiceStudioTimer" class="font-mono text-xs font-black text-slatebrand-900">00:00</span>
+                                <span class="text-slate-400">•</span>
+                                <p id="voiceStudioStatusText" class="text-[11px] font-bold text-slate-600">Tap mic to start recording</p>
+                            </div>
+
+                            <!-- Post-Recording Action Buttons -->
+                            <div class="flex items-center gap-2 pt-1">
+                                <button id="voiceStudioPreviewBtn" onclick="HardwareRecorder.playPreview()" class="hidden px-3 py-1.5 rounded-xl bg-slatebrand-900 hover:bg-slatebrand-800 text-goldaccent-300 font-extrabold text-xs shadow-xs transition active:scale-95 flex items-center gap-1">
+                                    <span>▶</span>
+                                    <span data-i18n="test_playback">Play Preview</span>
+                                </button>
+                                <button id="voiceStudioSaveBtn" onclick="saveRecordedVoice()" class="hidden px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs transition active:scale-95 flex items-center gap-1">
+                                    <span>💾</span>
+                                    <span data-i18n="save_voice">Save Custom Voice</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Secondary Controls: Upload File, Download .mp3, Reset to Default -->
+                        <div class="flex items-center justify-between gap-1.5 pt-1 text-[11px]">
+                            <button onclick="triggerAudioFileUpload()" class="px-2.5 py-1.5 rounded-xl bg-parchment-200 hover:bg-parchment-300 text-slatebrand-900 font-bold transition flex items-center gap-1">
+                                <span>📁</span>
+                                <span data-i18n="upload_audio_file">Upload Audio</span>
+                            </button>
+
+                            <div class="flex items-center gap-1.5">
+                                <button id="dockDownloadBtn" onclick="exportCurrentTargetVoice()" style="display: none;" class="px-2.5 py-1.5 rounded-xl bg-parchment-200 hover:bg-parchment-300 text-slatebrand-900 font-bold transition flex items-center gap-1" title="Download recording as .mp3">
+                                    <span>📥</span>
+                                    <span data-i18n="download_clip">Download</span>
+                                </button>
+                                <button id="dockResetBtn" onclick="resetCurrentTargetVoice()" style="display: none;" class="px-2.5 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold transition flex items-center gap-1" title="Reset this character to default chime">
+                                    <span>↺</span>
+                                    <span data-i18n="reset_voice">Reset</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Chips & Search Bar -->
+                    <div class="space-y-2">
+                        <!-- Horizontal Filter Chips -->
+                        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                            <button id="studioFilter_all" onclick="setVoiceStudioFilter('all')" class="px-3 py-1.5 rounded-xl font-extrabold text-xs bg-emerald-600 text-white shadow-xs transition shrink-0" data-i18n="filter_all">All Items</button>
+                            <button id="studioFilter_consonants" onclick="setVoiceStudioFilter('consonants')" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-700 border border-parchment-300 hover:bg-parchment-100 transition shrink-0" data-i18n="filter_consonants">Consonants (25)</button>
+                            <button id="studioFilter_vowels" onclick="setVoiceStudioFilter('vowels')" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-700 border border-parchment-300 hover:bg-parchment-100 transition shrink-0" data-i18n="filter_vowels">Vowels (9)</button>
+                            <button id="studioFilter_extras" onclick="setVoiceStudioFilter('extras')" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-700 border border-parchment-300 hover:bg-parchment-100 transition shrink-0" data-i18n="filter_extras">Extra Keys</button>
+                            <button id="studioFilter_matras" onclick="setVoiceStudioFilter('matras')" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-700 border border-parchment-300 hover:bg-parchment-100 transition shrink-0" data-i18n="filter_matras">Matras</button>
+                            <button id="studioFilter_phrases" onclick="setVoiceStudioFilter('phrases')" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-700 border border-parchment-300 hover:bg-parchment-100 transition shrink-0" data-i18n="filter_phrases">Phrases</button>
+                        </div>
+
+                        <!-- Search Box -->
+                        <div class="relative">
+                            <input id="voiceStudioSearch" oninput="renderVoiceStudioList()" type="text" placeholder="Search character, word or meaning..." data-i18n-placeholder="voice_studio_search" class="w-full px-3.5 py-2 pl-9 rounded-2xl bg-white border border-parchment-300 text-xs font-bold text-slatebrand-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <span class="absolute left-3 top-2.5 text-xs text-slate-400">🔍</span>
+                        </div>
+                    </div>
+
+                    <!-- List of Characters & Items -->
+                    <div id="voiceStudioListContainer" class="space-y-1.5">
+                        <!-- Dynamically populated by renderVoiceStudioList() -->
+                    </div>
+
+                    <!-- Backup & Portable Audio Pack Bar -->
+                    <div class="bg-white rounded-2xl p-3 border border-parchment-300 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="font-extrabold text-xs text-slatebrand-900 flex items-center gap-1.5">
+                                <span>📦</span> Audio Pack Backup & Portability
+                            </div>
+                            <span class="text-[9px] font-bold text-slate-500">JSON + Audio</span>
+                        </div>
+                        <p class="text-[10px] text-slate-600 leading-snug">
+                            Export all your authentic voice recordings to share with family or import onto another phone.
+                        </p>
+                        <div class="grid grid-cols-2 gap-2 pt-0.5">
+                            <button onclick="CustomAudioStore.exportAudioPack()" class="py-2 px-2.5 rounded-xl bg-slatebrand-900 hover:bg-slatebrand-800 text-white font-extrabold text-[10px] shadow-xs transition flex items-center justify-center gap-1">
+                                <span>📦</span>
+                                <span data-i18n="export_backup">Export Pack</span>
+                            </button>
+                            <button onclick="triggerAudioPackUpload()" class="py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] shadow-xs transition flex items-center justify-center gap-1">
+                                <span>📥</span>
+                                <span data-i18n="import_backup">Import Pack</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Hidden Input Elements for File Uploads -->
+                <input type="file" id="voiceStudioFileInput" accept="audio/*" onchange="handleAudioFileSelected(event)" class="hidden">
+                <input type="file" id="voiceStudioPackInput" accept=".json,application/json" onchange="handleAudioPackSelected(event)" class="hidden">
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODAL 5: CREDITS & CONTRIBUTORS MODAL                     -->
+        <!-- ========================================================= -->
+        <div id="creditsModal" class="hidden fixed inset-0 z-50 flex justify-center bg-slate-950/85 backdrop-blur-sm">
+            <div class="w-full max-w-[460px] bg-parchment-50 h-full flex flex-col shadow-2xl overflow-hidden">
+                <!-- Header -->
+                <div class="dhaka-header text-white px-4 py-3 flex items-center justify-between border-b border-white/10 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">👥</span>
+                        <div>
+                            <h2 class="text-sm font-extrabold leading-none" data-i18n="credits_modal_title">Credits & Contributors</h2>
+                            <p class="text-[10px] text-parchment-200 mt-0.5" data-i18n="credits_modal_sub">The cultural elders, linguists, voice artists, and builders</p>
+                        </div>
+                    </div>
+                    <button onclick="closeCreditsModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-bold transition">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Content Container -->
+                <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div id="creditsListContainer" class="space-y-4">
+                        <!-- Dynamically populated by renderCreditsModal() -->
+                    </div>
+
+                    <!-- Cultural Acknowledgement Callout -->
+                    <div class="bg-gradient-to-br from-emerald-900 to-slatebrand-900 text-white rounded-2xl p-4 border border-emerald-500/30 text-center space-y-1.5 shadow-md">
+                        <div class="font-limbu text-2xl text-goldaccent-400 font-bold">ᤛᤣᤘᤠᤖᤥ • Sewaro!</div>
+                        <h4 class="font-extrabold text-xs">Preserving Yakthung Heritage for Future Generations</h4>
+                        <p class="text-[10px] text-emerald-200/90 leading-relaxed">
+                            Every character, stroke, and audio recording in this application is created to celebrate the rich cultural heritage and linguistic beauty of the Limbu community.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODAL 6: MODERN ACCOUNT & CLOUD PROGRESS SYNC             -->
+        <!-- ========================================================= -->
+        <div id="authModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/85 backdrop-blur-md p-0 sm:p-4">
+            <div class="w-full max-w-sm sm:max-w-md bg-gradient-to-b from-[#131d2e] via-[#0f1728] to-[#090e17] text-white border-t sm:border border-white/10 rounded-t-[32px] sm:rounded-[32px] flex flex-col shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)] overflow-hidden max-h-[94vh]">
+                
+                <!-- Mobile top drag indicator -->
+                <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-1 sm:hidden"></div>
+
+                <!-- Modern Modal Header -->
+                <div class="px-5 py-4 flex items-center justify-between border-b border-white/10 shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 border border-emerald-400/40 flex items-center justify-center shadow-md">
+                            <span class="font-limbu text-lg text-white font-bold">ᤕ</span>
+                        </div>
+                        <div>
+                            <h2 id="authModalDynamicTitle" class="text-sm font-black tracking-tight text-white leading-none">Account & Progress Sync</h2>
+                            <p id="authModalDynamicSub" class="text-[11px] text-emerald-300/80 font-medium mt-1">Store your stars, XP & voices across devices</p>
+                        </div>
+                    </div>
+                    <button id="authModalCloseBtn" onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center text-sm font-bold transition active:scale-90" title="Close">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Main Scrollable Content -->
+                <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+                    
+                    <!-- Guest Card (Shown when not signed in) -->
+                    <div id="authGuestCard" class="space-y-4">
+                        <div class="bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-white/10 shadow-inner text-center space-y-4">
+                            
+                            <!-- Sleek Segmented Tab Switcher (Google, Email, Sign Up) -->
+                            <div class="grid grid-cols-3 gap-1.5 p-1 bg-slate-950/80 rounded-2xl border border-slate-700/60 text-xs font-bold shadow-inner">
+                                <button id="tabBtnGoogle" onclick="switchAuthTab('google')" class="py-2.5 px-2 rounded-xl text-center transition text-slate-400 hover:text-white font-bold cursor-pointer">
+                                    <span>🌐 Google</span>
+                                </button>
+                                <button id="tabBtnEmail" onclick="switchAuthTab('email')" class="py-2.5 px-2 rounded-xl text-center transition bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-md font-black cursor-pointer">
+                                    <span>✉️ Log In</span>
+                                </button>
+                                <button id="tabBtnRegister" onclick="switchAuthTab('register')" class="py-2.5 px-2 rounded-xl text-center transition text-slate-400 hover:text-white font-bold cursor-pointer">
+                                    <span>✨ Sign Up</span>
+                                </button>
+                            </div>
+
+                            <!-- Tab 1: Google Sign-In with Official Account Chooser Popup -->
+                            <div id="tabContentGoogle" class="hidden pt-1 space-y-3">
+                                <button id="btnContinueGoogle" onclick="handleGoogleSignInBtnClick()" class="w-full py-4 px-6 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-extrabold text-xs sm:text-sm shadow-xl flex items-center justify-center gap-3 transition cursor-pointer">
+                                    <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                                    </svg>
+                                    <span>Continue with Google</span>
+                                </button>
+                                <p class="text-[11px] text-slate-400 text-center">Fast, one-tap sign-in with your Google account</p>
+
+                                <!-- Error / Config Helper Banner (Appears if Google reports configuration needed) -->
+                                <div id="googleAuthDiagnosticBanner" class="hidden p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-left text-xs space-y-1.5">
+                                    <div class="font-bold text-amber-300 flex items-center gap-1.5">
+                                        <span>🔑</span> <span id="googleDiagTitle">Google Setup Notice</span>
+                                    </div>
+                                    <p id="googleDiagMessage" class="text-[11px] text-amber-200/90 leading-relaxed"></p>
+                                </div>
+
+                                <div class="relative flex items-center my-2">
+                                    <div class="flex-grow border-t border-slate-700/60"></div>
+                                    <span class="flex-shrink mx-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">or 1-Tap Instant Connect</span>
+                                    <div class="flex-grow border-t border-slate-700/60"></div>
+                                </div>
+
+                                <div class="space-y-2 text-left">
+                                    <div>
+                                        <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">Your Google Name or Email</label>
+                                        <div class="flex items-center bg-slate-950/80 border border-slate-700/80 rounded-2xl focus-within:border-emerald-400 transition overflow-hidden">
+                                            <span class="pl-3.5 text-sm text-slate-400 select-none">👤</span>
+                                            <input id="googleNameOrEmailInput" type="text" placeholder="e.g. Numa Phung or user@gmail.com" class="w-full bg-transparent px-3 py-2.5 text-white placeholder-slate-500 text-xs font-medium focus:outline-none">
+                                        </div>
+                                    </div>
+                                    <button onclick="handleQuickGoogleConnectBtn()" type="button" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-95 text-white font-extrabold text-xs shadow-md transition cursor-pointer">
+                                        ✓ Connect Profile &amp; Start
+                                    </button>
+                                </div>
+
+                                <div class="pt-2 text-center text-xs text-slate-400">
+                                    Prefer email? <button onclick="switchAuthTab('email')" type="button" class="text-emerald-400 font-extrabold hover:underline">Log In with Email</button>
+                                </div>
+                            </div>
+
+                            <!-- Tab 2: Modern Email & Password Sign-In (For existing accounts) -->
+                            <div id="tabContentEmail" class="pt-1 space-y-4 text-left">
+                                <!-- Email Input -->
+                                <div>
+                                    <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
+                                    <div class="relative flex items-center bg-slate-950/80 border border-slate-700/80 rounded-2xl focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/25 transition overflow-hidden">
+                                        <span class="pl-3.5 text-base text-slate-400 select-none">✉️</span>
+                                        <input id="firebaseEmailInput" type="email" autocomplete="email" placeholder="learner@example.com" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-xs sm:text-sm font-medium focus:outline-none">
+                                    </div>
+                                </div>
+
+                                <!-- Password Input with Visibility Eye Toggle -->
+                                <div>
+                                    <div class="flex items-center justify-between mb-1.5">
+                                        <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Password</label>
+                                        <button onclick="resetPasswordWithFirebase()" type="button" class="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 hover:underline">Forgot password?</button>
+                                    </div>
+                                    <div class="relative flex items-center bg-slate-950/80 border border-slate-700/80 rounded-2xl focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/25 transition overflow-hidden">
+                                        <span class="pl-3.5 text-base text-slate-400 select-none">🔒</span>
+                                        <input id="firebasePasswordInput" type="password" autocomplete="current-password" placeholder="••••••••" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-xs sm:text-sm font-medium focus:outline-none">
+                                        <button type="button" onclick="togglePasswordVisibility('firebasePasswordInput', this)" class="pr-3.5 pl-2 text-sm text-slate-400 hover:text-white transition cursor-pointer select-none" title="Show / Hide Password">👁️</button>
+                                    </div>
+                                </div>
+
+                                <!-- Big High-Contrast Action Button -->
+                                <button onclick="signInWithEmailPassword()" class="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 active:scale-95 text-white font-black text-sm shadow-xl shadow-emerald-950/60 flex items-center justify-center gap-2 transition cursor-pointer">
+                                    <span>🔐</span>
+                                    <span>Log In with Email</span>
+                                    <span class="text-emerald-200">→</span>
+                                </button>
+
+                                <!-- Switch to Register -->
+                                <p class="text-center text-xs text-slate-400 pt-1">
+                                    Don't have an account? <button onclick="switchAuthTab('register')" type="button" class="text-emerald-400 font-extrabold hover:underline">Create Account (Sign Up)</button>
+                                </p>
+
+                                <!-- Divider & Quick Google option -->
+                                <div class="flex items-center gap-3 pt-2">
+                                    <div class="h-px bg-white/10 flex-1"></div>
+                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Or continue with</span>
+                                    <div class="h-px bg-white/10 flex-1"></div>
+                                </div>
+
+                                <button onclick="handleGoogleSignInBtnClick()" class="w-full py-2.5 px-4 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-bold text-xs flex items-center justify-center gap-2.5 transition shadow-sm cursor-pointer">
+                                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                                    </svg>
+                                    <span>Continue with Google</span>
+                                </button>
+                            </div>
+
+                            <!-- Tab 3: Modern Sign Up & Choose Username -->
+                            <div id="tabContentRegister" class="hidden pt-1 space-y-3.5 text-left">
+                                <!-- Field 1: Choose Username -->
+                                <div>
+                                    <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">Choose Username</label>
+                                    <div class="relative flex items-center bg-slate-950/80 border border-slate-700/80 rounded-2xl focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/25 transition overflow-hidden">
+                                        <span class="pl-3.5 text-base text-slate-400 select-none">👤</span>
+                                        <input id="firebaseRegUsernameInput" type="text" autocomplete="username" placeholder="e.g. Suman Limbu or LimbuHero" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-xs sm:text-sm font-medium focus:outline-none">
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 mt-1 pl-1">Your display name on the trail & leaderboards</p>
+                                </div>
+
+                                <!-- Field 2: Email Address -->
+                                <div>
+                                    <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
+                                    <div class="relative flex items-center bg-slate-950/80 border border-slate-700/80 rounded-2xl focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/25 transition overflow-hidden">
+                                        <span class="pl-3.5 text-base text-slate-400 select-none">✉️</span>
+                                        <input id="firebaseRegEmailInput" type="email" autocomplete="email" placeholder="learner@example.com" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-xs sm:text-sm font-medium focus:outline-none">
+                                    </div>
+                                </div>
+
+                                <!-- Field 3: Password (6+ chars) -->
+                                <div>
+                                    <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">Create Password (6+ characters)</label>
+                                    <div class="relative flex items-center bg-slate-950/80 border border-slate-700/80 rounded-2xl focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/25 transition overflow-hidden">
+                                        <span class="pl-3.5 text-base text-slate-400 select-none">🔒</span>
+                                        <input id="firebaseRegPasswordInput" type="password" autocomplete="new-password" placeholder="At least 6 characters" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-xs sm:text-sm font-medium focus:outline-none">
+                                        <button type="button" onclick="togglePasswordVisibility('firebaseRegPasswordInput', this)" class="pr-3.5 pl-2 text-sm text-slate-400 hover:text-white transition cursor-pointer select-none" title="Show / Hide Password">👁️</button>
+                                    </div>
+                                </div>
+
+                                <!-- Big High-Contrast Action Button -->
+                                <button onclick="signUpWithEmailPassword()" class="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:opacity-95 active:scale-95 text-white font-black text-sm shadow-xl shadow-emerald-950/60 flex items-center justify-center gap-2 transition cursor-pointer">
+                                    <span>✨</span>
+                                    <span>Create Account & Start Learning</span>
+                                    <span class="text-teal-200">→</span>
+                                </button>
+
+                                <!-- Switch to Log In -->
+                                <p class="text-center text-xs text-slate-400 pt-1">
+                                    Already have an account? <button onclick="switchAuthTab('email')" type="button" class="text-emerald-400 font-extrabold hover:underline">Log In</button>
+                                </p>
+
+                                <!-- Divider & Quick Google option -->
+                                <div class="flex items-center gap-3 pt-2">
+                                    <div class="h-px bg-white/10 flex-1"></div>
+                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Or sign up with</span>
+                                    <div class="h-px bg-white/10 flex-1"></div>
+                                </div>
+
+                                <button onclick="handleGoogleSignInBtnClick()" class="w-full py-2.5 px-4 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-bold text-xs flex items-center justify-center gap-2.5 transition shadow-sm cursor-pointer">
+                                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                                    </svg>
+                                    <span>Continue with Google</span>
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Signed-In Profile Card (Shown when authenticated) -->
+                    <div id="authProfileCard" class="hidden space-y-4">
+                        <div class="bg-slate-900/70 rounded-3xl p-5 border border-white/10 shadow-lg text-center space-y-4">
+                            <div class="relative w-20 h-20 mx-auto">
+                                <img id="authProfileImage" src="" alt="Profile" class="w-full h-full object-cover rounded-full border-2 border-emerald-500 shadow-md">
+                                <span class="w-4 h-4 rounded-full bg-emerald-500 absolute bottom-0 right-0 ring-2 ring-slate-900"></span>
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-center gap-2">
+                                    <h3 id="authProfileName" class="font-black text-lg text-white">Yakthung Learner</h3>
+                                    <button onclick="toggleEditUsername(true)" class="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition" title="Change Username">
+                                        ✏️
+                                    </button>
+                                </div>
+                                <!-- Inline username editor -->
+                                <div id="usernameEditRow" class="hidden mt-2 p-2.5 rounded-2xl bg-slate-950/80 border border-slate-700 text-left space-y-1.5">
+                                    <label class="block text-[10px] font-bold text-slate-400">Change Username</label>
+                                    <div class="flex items-center gap-2">
+                                        <input id="editUsernameInput" type="text" placeholder="Enter new username" class="flex-1 px-3 py-2 text-xs bg-slate-900 text-white border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+                                        <button onclick="saveChosenUsername()" class="px-3.5 py-2 text-xs font-bold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 active:scale-95 transition">Save</button>
+                                        <button onclick="toggleEditUsername(false)" class="px-2.5 py-2 text-xs font-bold bg-white/10 text-white rounded-xl hover:bg-white/20">✕</button>
+                                    </div>
+                                </div>
+                                <p id="authProfileEmail" class="text-xs text-slate-400 mt-1">learner@gmail.com</p>
+                                <span id="authProviderBadge" class="inline-block mt-2 text-[10px] font-extrabold px-3 py-1 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/30" data-i18n="signed_in_badge">
+                                    ● Account Connected & Synced
+                                </span>
+                            </div>
+
+                            <!-- Cloud Sync Status Bar -->
+                            <div class="bg-slate-950/70 rounded-2xl p-3.5 border border-emerald-500/30 flex items-center justify-between gap-2 text-left">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="text-xl">☁️</span>
+                                    <div>
+                                        <div class="font-extrabold text-xs text-emerald-300" data-i18n="cloud_synced_badge">Cloud Sync Active ✓</div>
+                                        <div class="text-[10px] text-slate-400">Last synced: <span id="authSyncTimestamp" class="text-white">Just now</span></div>
+                                    </div>
+                                </div>
+                                <button onclick="syncCloudProgress(true)" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] shadow-sm transition active:scale-95" data-i18n="sync_now_btn">
+                                    Sync Now
+                                </button>
+                            </div>
+
+                            <!-- Sign Out Button -->
+                            <div class="pt-2 border-t border-white/10">
+                                <button onclick="signOutUser()" class="w-full py-3 px-4 rounded-full bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-extrabold text-xs transition border border-rose-500/30 active:scale-95" data-i18n="signout_btn">
+                                    Sign Out
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cloud Features Explainer -->
+                    <div class="bg-slate-900/50 rounded-2xl p-4 border border-white/5 space-y-2 text-xs text-slate-300">
+                        <h4 class="font-extrabold text-white flex items-center gap-1.5">
+                            <span>✨</span> What gets synchronized?
+                        </h4>
+                        <ul class="space-y-1.5 text-[11px] text-slate-400">
+                            <li class="flex items-center gap-2">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>All 21 Mountain Trail levels & star ratings</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Mastered characters, daily streak & earned XP</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Personalized audio recordings in your Voice Studio</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODULAR APPLICATION ENGINE                                -->
+    <!-- ========================================================= -->
+    <script src="js/i18n.js"></script>
+    <script src="js/curriculum.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/custom-audio.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/credits.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/chart.js"></script>
+    <script src="js/tracing.js"></script>
+    <script src="js/quiz.js"></script>
+    <script src="js/saknam.js"></script>
+    <script src="js/tiles.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

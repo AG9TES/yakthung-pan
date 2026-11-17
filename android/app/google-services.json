@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "923150025349",
+    "project_id": "yakthung-pan",
+    "storage_bucket": "yakthung-pan.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:923150025349:android:dc8815d8b0dddb705edfec",
+        "android_client_info": {
+          "package_name": "com.yakthung.pan"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "923150025349-92q8j8447cedud48e68pp2ungs0b82b9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTtRZBe_CGc0k0xZzQ8KDzJEAFoN9Huo8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "923150025349-92q8j8447cedud48e68pp2ungs0b82b9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

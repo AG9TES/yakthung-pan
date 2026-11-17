@@ -1,0 +1,77 @@
+{
+  "name": "Yakthung Pan - Sirijonga Limbu Learning",
+  "short_name": "Yakthung Pan",
+  "description": "Complete authentic Sirijonga script and Limbu language learning app with interactive tracing, boss quizzes, and native audio.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0B131E",
+  "theme_color": "#047857",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": [
+    "education",
+    "language",
+    "games"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Continue Adventure",
+      "short_name": "Adventure",
+      "description": "Continue your Sirijonga learning quest",
+      "url": "./index.html",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Sirijonga Chart",
+      "short_name": "Chart",
+      "description": "View full 45-character Sirijonga alphabet chart",
+      "url": "./index.html#chart",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
+

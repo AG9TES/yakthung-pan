@@ -14,6 +14,13 @@ temp_*.ttf
 debug.keystore
 *.keystore
 
+# Android Gradle Build Outputs
+.gradle/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/app/build/
+
 # Vercel
 .vercel
 .vercel//
@@ -25,6 +32,13 @@ Thumbs.db
 debug.keystore
 *.keystore
 
+# Android Gradle Build Outputs
+.gradle/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/app/build/
+
 # Vercel
 .vercel
 .vercel/
@@ -32,6 +46,13 @@ debug.keystore
 # Keystore & Secrets
 debug.keystore
 *.keystore
+
+# Android Gradle Build Outputs
+.gradle/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/app/build/
 
 # Vercel
 .vercel
