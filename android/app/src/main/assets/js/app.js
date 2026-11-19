@@ -315,10 +315,6 @@ function showWelcomeScreen() {
 }
 
 function dismissWelcomeScreen() {
-    if (typeof getCurrentUser === 'function' && !getCurrentUser()) {
-        if (typeof openAuthModal === 'function') openAuthModal(true);
-        return;
-    }
     const welcome = document.getElementById('welcomeScreen');
     if (welcome) {
         welcome.classList.add('hidden');
@@ -331,7 +327,7 @@ function dismissWelcomeScreen() {
     try {
         const targetLvl = (typeof getEffectiveUnlockedLevel === 'function') 
             ? getEffectiveUnlockedLevel() 
-            : (progress.unlockedLevel || 1);
+            : ((typeof progress !== 'undefined' && progress.unlockedLevel) ? progress.unlockedLevel : 1);
         if (typeof renderWindingMap === 'function') renderWindingMap(targetLvl);
     } catch (e) {
         console.warn('[Welcome] renderWindingMap error:', e);

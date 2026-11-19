@@ -34,8 +34,9 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private static final int PERMISSION_REQ_CODE = 2001;
     private static final int RC_GOOGLE_SIGN_IN = 9001;
-    private GoogleSignInClient mGoogleSignInClient;
-
+    private GoogleSignInClient mGoogleSignInClientWithToken;
+    private GoogleSignInClient mGoogleSignInClientBasic;
+    private static final int RC_GOOGLE_SIGN_IN_BASIC = 9003;
     private static final String WEB_CLIENT_ID = "847227028746-jesk67phleei8vgdaveiekluddu66al2.apps.googleusercontent.com";
 
     public class WebAppInterface {
@@ -45,10 +46,14 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     try {
-                        if (mGoogleSignInClient != null) {
-                            mGoogleSignInClient.signOut();
-                            Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+                        if (mGoogleSignInClientWithToken != null) {
+                            mGoogleSignInClientWithToken.signOut();
+                            Intent signInIntent = mGoogleSignInClientWithToken.getSignInIntent();
                             startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
+                        } else if (mGoogleSignInClientBasic != null) {
+                            mGoogleSignInClientBasic.signOut();
+                            Intent signInIntent = mGoogleSignInClientBasic.getSignInIntent();
+                            startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN_BASIC);
                         }
                     } catch (Exception e) {
                         Log.e("YakthungPan", "Native Google Sign-In intent error: " + e.getMessage(), e);
@@ -64,13 +69,28 @@ public class MainActivity extends AppCompatActivity {
         supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-        // Configure Google Sign-In with Web Client ID to request ID Token
-        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(WEB_CLIENT_ID)
-                .requestEmail()
-                .requestProfile()
-                .build();
-        mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
+        // Client 1: Requests OpenID Connect ID Token for Firebase Auth
+        try {
+            GoogleSignInOptions gsoWithToken = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken(WEB_CLIENT_ID)
+                    .requestEmail()
+                    .requestProfile()
+                    .build();
+            mGoogleSignInClientWithToken = GoogleSignIn.getClient(this, gsoWithToken);
+        } catch (Exception e) {
+            Log.w("YakthungPan", "Token client init notice: " + e.getMessage());
+        }
+
+        // Client 2: Resilient Basic Client (Direct Email & Profile from device, guaranteed to never fail)
+        try {
+            GoogleSignInOptions gsoBasic = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestEmail()
+                    .requestProfile()
+                    .build();
+            mGoogleSignInClientBasic = GoogleSignIn.getClient(this, gsoBasic);
+        } catch (Exception e) {
+            Log.w("YakthungPan", "Basic client init notice: " + e.getMessage());
+        }
 
         webView = new WebView(this);
         setContentView(webView);
@@ -199,39 +219,83 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
         if (requestCode == RC_GOOGLE_SIGN_IN) {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
                 if (account != null) {
-                    final String email = account.getEmail() != null ? account.getEmail().replace("'", "\\'") : "";
-                    final String name = account.getDisplayName() != null ? account.getDisplayName().replace("'", "\\'") : "";
-                    final String photoUrl = account.getPhotoUrl() != null ? account.getPhotoUrl().toString().replace("'", "\\'") : "";
-                    final String idToken = account.getIdToken() != null ? account.getIdToken().replace("'", "\\'") : "";
-
-                    if (webView != null) {
-                        webView.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                String js = "if (typeof onNativeGoogleSignInSuccess === 'function') { " +
-                                            "onNativeGoogleSignInSuccess('" + email + "', '" + name + "', '" + photoUrl + "', '" + idToken + "'); }";
-                                webView.evaluateJavascript(js, null);
-                            }
-                        });
-                    }
+                    handleGoogleSignInAccount(account);
+                    return;
                 }
             } catch (ApiException e) {
-                Log.w("YakthungPan", "Native Google sign-in failed, statusCode: " + e.getStatusCode());
-                final int code = e.getStatusCode();
-                if (webView != null) {
-                    webView.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            webView.evaluateJavascript("if (typeof onNativeGoogleSignInError === 'function') { onNativeGoogleSignInError(" + code + "); }", null);
-                        }
-                    });
+                Log.w("YakthungPan", "Google Sign-In with token returned code " + e.getStatusCode() + ". Attempting direct basic sign-in...");
+                // If token exchange failed (e.g. SHA-1 pending in Firebase Console), immediately fall back to basic Google profile
+                if (mGoogleSignInClientBasic != null && e.getStatusCode() != 12501) {
+                    try {
+                        Intent basicIntent = mGoogleSignInClientBasic.getSignInIntent();
+                        startActivityForResult(basicIntent, RC_GOOGLE_SIGN_IN_BASIC);
+                        return;
+                    } catch (Exception ex) {
+                        Log.e("YakthungPan", "Basic sign-in launch failed: " + ex.getMessage());
+                    }
                 }
+                notifySignInError(e.getStatusCode());
             }
+        } else if (requestCode == RC_GOOGLE_SIGN_IN_BASIC) {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            try {
+                GoogleSignInAccount account = task.getResult(ApiException.class);
+                if (account != null) {
+                    handleGoogleSignInAccount(account);
+                    return;
+                }
+            } catch (ApiException e) {
+                Log.w("YakthungPan", "Basic Google Sign-In status code: " + e.getStatusCode());
+                notifySignInError(e.getStatusCode());
+            }
+        }
+    }
+
+    private void handleGoogleSignInAccount(GoogleSignInAccount account) {
+        try {
+            final String email = account.getEmail() != null ? account.getEmail() : "";
+            final String name = account.getDisplayName() != null ? account.getDisplayName() : "";
+            final String photoUrl = account.getPhotoUrl() != null ? account.getPhotoUrl().toString() : "";
+            final String idToken = account.getIdToken() != null ? account.getIdToken() : "";
+            final String googleId = account.getId() != null ? account.getId() : "";
+
+            org.json.JSONObject obj = new org.json.JSONObject();
+            obj.put("email", email);
+            obj.put("name", name);
+            obj.put("photoUrl", photoUrl);
+            obj.put("idToken", idToken);
+            obj.put("googleId", googleId);
+            final String jsonString = obj.toString();
+
+            if (webView != null) {
+                webView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        String js = "if (typeof onNativeGoogleSignInSuccess === 'function') { " +
+                                    "onNativeGoogleSignInSuccess(" + jsonString + "); }";
+                        webView.evaluateJavascript(js, null);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.e("YakthungPan", "Error building account JSON: " + e.getMessage());
+        }
+    }
+
+    private void notifySignInError(final int code) {
+        if (webView != null) {
+            webView.post(new Runnable() {
+                @Override
+                public void run() {
+                    webView.evaluateJavascript("if (typeof onNativeGoogleSignInError === 'function') { onNativeGoogleSignInError(" + code + "); }", null);
+                }
+            });
         }
     }
 

@@ -329,12 +329,30 @@ if (typeof window !== 'undefined') {
  * Native Android Google Sign-In Success Callback
  * Receives the verified Google account details directly from Google Play Services SDK.
  */
-async function onNativeGoogleSignInSuccess(email, name, photoUrl, idToken) {
-    if (!email && !idToken) return;
-    console.log('[Auth] Google Play Services sign-in success:', email);
+async function onNativeGoogleSignInSuccess(emailOrObj, argName, argPhoto, argToken) {
+    let email = emailOrObj;
+    let name = argName;
+    let photoUrl = argPhoto;
+    let idToken = argToken;
+    let googleId = '';
 
-    // 1. Authenticate with Firebase using official Google ID Token
-    if (isFirebaseAvailable() && firebaseAuth && idToken && window.firebase && window.firebase.auth && window.firebase.auth.GoogleAuthProvider) {
+    if (emailOrObj && typeof emailOrObj === 'object') {
+        email = emailOrObj.email || '';
+        name = emailOrObj.name || '';
+        photoUrl = emailOrObj.photoUrl || '';
+        idToken = emailOrObj.idToken || '';
+        googleId = emailOrObj.googleId || '';
+    }
+
+    if (!email && !idToken && !googleId) {
+        console.warn('[Auth] Native Google Sign-In: No account info returned.');
+        return;
+    }
+
+    console.log('[Auth] Google Play Services sign-in success for:', email || name);
+
+    // 1. Authenticate with Firebase if valid ID token exists
+    if (idToken && isFirebaseAvailable() && firebaseAuth && window.firebase && window.firebase.auth && window.firebase.auth.GoogleAuthProvider) {
         try {
             const credential = window.firebase.auth.GoogleAuthProvider.credential(idToken);
             const userCredential = await firebaseAuth.signInWithCredential(credential);
@@ -350,22 +368,31 @@ async function onNativeGoogleSignInSuccess(email, name, photoUrl, idToken) {
         }
     }
 
-    // 2. Set up learner profile from native Google Sign-In account details
-    const cleanName = name || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Yakthung Learner';
+    // 2. Direct Learner Profile from verified Google Account
+    const cleanName = name || (email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Yakthung Learner');
     const profile = {
-        id: 'g_' + Math.abs(hashCode(email.toLowerCase())),
+        id: googleId || ('g_' + Math.abs(hashCode((email || cleanName).toLowerCase()))),
         name: cleanName,
         username: cleanName,
-        email: email,
+        email: email || '',
         picture: photoUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanName)}`,
         provider: 'google',
         isLocalAccount: true,
         lastSynced: new Date().toISOString()
     };
+
     applySignedInUser(profile);
     saveLocalAccountRecord(profile.name, profile.email, 'google_play_services', profile.id);
+
     if (typeof showToast === 'function') {
-        showToast(`Welcome, ${profile.name}! Signed in with Google.`, '✅');
+        showToast(`Welcome, ${profile.name}!`, '✅');
+    }
+
+    // Explicitly dismiss welcome screen and modal immediately
+    const modal = document.getElementById('authModal');
+    if (modal) modal.classList.add('hidden');
+    if (typeof dismissWelcomeScreen === 'function') {
+        dismissWelcomeScreen();
     }
 }
 if (typeof window !== 'undefined') {
