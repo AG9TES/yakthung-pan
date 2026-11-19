@@ -131,7 +131,10 @@ public class MainActivity extends AppCompatActivity {
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 String path = request.getUrl().getPath();
-                if (url.startsWith("https://localhost/") || url.startsWith("http://localhost/") || url.startsWith("file:///android_asset/")) {
+                if (url.contains("/__/auth/") || url.contains("accounts.google.com") || url.contains("apis.google.com")) {
+                    return super.shouldInterceptRequest(view, request);
+                }
+                if (url.startsWith("https://yakthung-pan.firebaseapp.com/") || url.startsWith("https://localhost/") || url.startsWith("http://localhost/") || url.startsWith("file:///android_asset/")) {
                     if (path == null || path.equals("/") || path.isEmpty()) {
                         path = "/index.html";
                     }
@@ -190,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         requestAppPermissions();
-        webView.loadUrl("https://localhost/index.html");
+        webView.loadUrl("https://yakthung-pan.firebaseapp.com/index.html");
     }
 
     @Override

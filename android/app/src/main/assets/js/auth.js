@@ -303,12 +303,99 @@ if (typeof window !== 'undefined') {
     window.handleGoogleIdentityCredentialResponse = handleGoogleIdentityCredentialResponse;
 }
 
-// 1. Unified Google Authentication Handler (Official Google OAuth Flow)
+// 1. Unified Google Authentication Handler
 async function handleGoogleSignInBtnClick() {
+    // A. Native Google Play Services SDK (Inside Android APK - shows official device Google accounts)
+    if (typeof window !== 'undefined' && window.AndroidNativeGoogleAuth && typeof window.AndroidNativeGoogleAuth.promptNativeGoogleSignIn === 'function') {
+        if (typeof showToast === 'function') {
+            showToast('Opening Google Sign-In...', '⏳');
+        }
+        try {
+            window.AndroidNativeGoogleAuth.promptNativeGoogleSignIn();
+            return;
+        } catch (e) {
+            console.warn('[Auth] Native Google Sign-In call error:', e);
+        }
+    }
+
+    // B. Official Web-Based Firebase Google OAuth (Inside Web Browsers: Chrome, Edge, Safari)
     await signInWithGoogleFirebase();
 }
 if (typeof window !== 'undefined') {
     window.handleGoogleSignInBtnClick = handleGoogleSignInBtnClick;
+}
+
+/**
+ * Native Android Google Sign-In Success Callback
+ * Receives the verified Google account details directly from Google Play Services SDK.
+ */
+async function onNativeGoogleSignInSuccess(email, name, photoUrl, idToken) {
+    if (!email && !idToken) return;
+    console.log('[Auth] Google Play Services sign-in success:', email);
+
+    // 1. Authenticate with Firebase using official Google ID Token
+    if (isFirebaseAvailable() && firebaseAuth && idToken && window.firebase && window.firebase.auth && window.firebase.auth.GoogleAuthProvider) {
+        try {
+            const credential = window.firebase.auth.GoogleAuthProvider.credential(idToken);
+            const userCredential = await firebaseAuth.signInWithCredential(credential);
+            if (userCredential && userCredential.user) {
+                if (typeof showToast === 'function') {
+                    showToast(`Signed in as ${userCredential.user.displayName || email}!`, '✅');
+                }
+                handleFirebaseAuthStateChanged(userCredential.user);
+                return;
+            }
+        } catch (e) {
+            console.warn('[Auth] Firebase credential exchange warning:', e);
+        }
+    }
+
+    // 2. Set up learner profile from native Google Sign-In account details
+    const cleanName = name || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Yakthung Learner';
+    const profile = {
+        id: 'g_' + Math.abs(hashCode(email.toLowerCase())),
+        name: cleanName,
+        username: cleanName,
+        email: email,
+        picture: photoUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanName)}`,
+        provider: 'google',
+        isLocalAccount: true,
+        lastSynced: new Date().toISOString()
+    };
+    applySignedInUser(profile);
+    saveLocalAccountRecord(profile.name, profile.email, 'google_play_services', profile.id);
+    if (typeof showToast === 'function') {
+        showToast(`Welcome, ${profile.name}! Signed in with Google.`, '✅');
+    }
+}
+if (typeof window !== 'undefined') {
+    window.onNativeGoogleSignInSuccess = onNativeGoogleSignInSuccess;
+}
+
+/**
+ * Native Android Google Sign-In Error Callback
+ * Handles errors and cancellations from Google Play Services.
+ */
+function onNativeGoogleSignInError(statusCode) {
+    console.warn('[Auth] Native Google Sign-In status code:', statusCode);
+    if (statusCode === 12501) {
+        // User cancelled the account picker sheet
+        if (typeof showToast === 'function') showToast('Google sign-in cancelled', 'ℹ️');
+    } else if (statusCode === 10 || statusCode === 12500) {
+        // DEVELOPER_ERROR (e.g. SHA-1 fingerprint needs to be in Firebase Console)
+        if (typeof showToast === 'function') {
+            showToast('Note: Add SHA-1 in Firebase Console for this app.', '⚠️');
+        }
+        signInWithGoogleFirebase();
+    } else {
+        if (typeof showToast === 'function') {
+            showToast(`Google Sign-In notice (${statusCode})`, 'ℹ️');
+        }
+        signInWithGoogleFirebase();
+    }
+}
+if (typeof window !== 'undefined') {
+    window.onNativeGoogleSignInError = onNativeGoogleSignInError;
 }
 
 /**
