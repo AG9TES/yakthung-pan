@@ -74,14 +74,14 @@
     <div class="w-full max-w-[460px] bg-parchment-50 min-h-screen flex flex-col shadow-2xl relative overflow-x-hidden border-x border-slate-800">
 
         <!-- ========================================================= -->
-        <!-- SCREEN 0: WELCOMING & LOGIN SCREEN (MATCHING POPPO STYLE)   -->
+        <!-- SCREEN 0: WELCOMING & SIGN-IN ONBOARDING SCREEN           -->
         <!-- ========================================================= -->
         <div id="welcomeScreen" class="fixed inset-0 z-50 flex justify-center bg-slate-950/95 backdrop-blur-md overflow-y-auto">
-            <div class="w-full max-w-[460px] bg-gradient-to-b from-slate-900 via-slate-900 to-emerald-950 min-h-screen flex flex-col justify-between p-6 text-white shadow-2xl relative border-x border-slate-800">
+            <div class="w-full max-w-[460px] bg-gradient-to-b from-[#0b1329] via-[#0d1829] to-[#04261d] min-h-screen flex flex-col justify-between p-6 text-white shadow-2xl relative border-x border-slate-800">
                 
-                <!-- Top Bar: Language on Left, Need help? on Right (Matching Image 2) -->
+                <!-- Top Bar: Language on Left, Need help? on Right -->
                 <div class="flex items-center justify-between">
-                    <button onclick="toggleLanguage()" class="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-black text-xs flex items-center gap-1 transition shadow-xs" title="Switch Language">
+                    <button onclick="toggleLanguage()" class="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white font-black text-xs flex items-center gap-1.5 transition shadow-xs active:scale-95 cursor-pointer" title="Switch Language">
                         <span id="welcomeLangFlag">🇬🇧</span>
                         <span id="welcomeLangText">EN</span>
                     </button>
@@ -91,91 +91,80 @@
                     </button>
                 </div>
 
-                <!-- Center Hero / Brand Identity (Matching Logo + Title from Image 2) -->
+                <!-- Center Hero / Brand Identity -->
                 <div class="my-auto py-6 flex flex-col items-center text-center space-y-4">
-                    <!-- App Logo & Title Row -->
-                    <div class="flex items-center gap-3">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 border-2 border-goldaccent-400 flex items-center justify-center shadow-xl shrink-0">
-                            <span class="font-limbu text-3xl text-white font-bold">ᤕ</span>
-                        </div>
-                        <div class="text-left">
-                            <h1 class="text-2xl font-black text-white tracking-tight uppercase leading-none">YAKTHUNG PAN</h1>
-                            <p class="text-xs text-emerald-300 font-semibold mt-1">Master Sirijonga Script & Dialect</p>
-                        </div>
+                    <!-- Glowing 3D App Emblem -->
+                    <div class="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-400 via-emerald-600 to-teal-800 border-2 border-amber-300 shadow-[0_12px_36px_rgba(16,185,129,0.35)] flex items-center justify-center shrink-0">
+                        <span class="font-limbu text-5xl text-white font-bold drop-shadow-md">ᤕ</span>
+                    </div>
+
+                    <!-- App Title & Subtitle -->
+                    <div>
+                        <h1 class="text-2xl font-black text-white tracking-tight uppercase leading-none">YAKTHUNG PAN</h1>
+                        <p class="text-xs text-emerald-300 font-semibold mt-1">Master Sirijonga Script &amp; Dialect</p>
                     </div>
 
                     <!-- Authentic Sirijonga Script Banner -->
-                    <div class="pt-2">
-                        <div class="font-limbu text-4xl text-goldaccent-400 font-bold tracking-wide drop-shadow-md">ᤛᤣᤘᤠᤖᤥ</div>
+                    <div class="pt-1">
+                        <div class="font-limbu text-4xl text-amber-400 font-bold tracking-wide drop-shadow-md">ᤛᤣᤘᤠᤖᤥ</div>
                         <p class="text-[10px] font-black uppercase tracking-widest text-emerald-400/90 mt-0.5">Sewaro! • Welcome</p>
+                    </div>
+
+                    <!-- Feature Highlights Pills -->
+                    <div class="flex items-center justify-center gap-1.5 pt-2 flex-wrap">
+                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/10 border border-white/10 text-emerald-200">
+                            🏔️ 21 Mountain Levels
+                        </span>
+                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/10 border border-white/10 text-emerald-200">
+                            🎙️ Native Audio
+                        </span>
+                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/10 border border-white/10 text-emerald-200">
+                            ☁️ Cloud Synced
+                        </span>
                     </div>
                 </div>
 
-                <!-- Bottom Login Actions Section (Exact layout of Image 2) -->
+                <!-- Bottom Login Actions Section -->
                 <div class="space-y-4 pb-2">
                     
-                    <!-- State A: Not Logged In (Show the 3 Pill Login Buttons) -->
+                    <!-- State A: Not Logged In -->
                     <div id="welcomeLoggedOutActions" class="space-y-3">
-                        <!-- Button 1: Log in with Google (With 'Latest Login' purple floating badge) -->
-                        <button onclick="handleGoogleSignInBtnClick()" class="relative w-full py-4 px-6 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-extrabold text-sm shadow-xl flex items-center justify-center gap-3 transition cursor-pointer">
-                            <span class="absolute -top-2.5 right-6 bg-indigo-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full shadow-md uppercase tracking-wider">
-                                Latest Login
-                            </span>
+                        <!-- Primary Hero Button: Continue with Google (Tactile 3D Button) -->
+                        <button onclick="handleGoogleSignInBtnClick()" class="w-full py-4 px-6 rounded-2xl bg-white hover:bg-slate-50 active:translate-y-0.5 text-slate-800 font-black text-sm shadow-[0_5px_0_#cbd5e1] active:shadow-[0_1px_0_#cbd5e1] flex items-center justify-center gap-3 transition cursor-pointer relative">
                             <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
                                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
                             </svg>
-                            <span>Log in with Google</span>
+                            <span>Continue with Google</span>
+                            <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">1-Tap</span>
                         </button>
 
-                        <!-- Button 2: Log in with Email -->
-                        <button onclick="openAuthModalWithTab('email')" class="w-full py-4 px-6 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-extrabold text-sm shadow-xl flex items-center justify-center gap-3 transition cursor-pointer">
-                            <span class="text-lg">✉️</span>
-                            <span>Log in with Email</span>
-                        </button>
+                        <!-- Secondary Split Actions: Log In with Email & Sign Up -->
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <button onclick="openAuthModalWithTab('email')" class="py-3 px-3 rounded-2xl bg-white/10 hover:bg-white/15 active:translate-y-0.5 border border-white/15 text-white font-extrabold text-xs shadow-sm flex items-center justify-center gap-2 transition cursor-pointer">
+                                <span class="text-base">✉️</span>
+                                <span>Log In with Email</span>
+                            </button>
+                            <button onclick="openAuthModalWithTab('register')" class="py-3 px-3 rounded-2xl bg-white/10 hover:bg-white/15 active:translate-y-0.5 border border-white/15 text-white font-extrabold text-xs shadow-sm flex items-center justify-center gap-2 transition cursor-pointer">
+                                <span class="text-base">✨</span>
+                                <span>Sign Up Free</span>
+                            </button>
+                        </div>
 
-                        <!-- Button 3: Create Account (Sign Up & Choose Username) -->
-                        <button onclick="openAuthModalWithTab('register')" class="w-full py-4 px-6 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-extrabold text-sm shadow-xl flex items-center justify-center gap-3 transition cursor-pointer">
-                            <span class="text-lg">✨</span>
-                            <span>Create Account (Sign Up)</span>
-                        </button>
-
-                        <!-- Button 4: Continue as Guest / Start Learning (Zero Barrier) -->
-                        <button onclick="dismissWelcomeScreen()" class="w-full py-3.5 px-6 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white font-extrabold text-xs sm:text-sm border border-white/20 shadow-md flex items-center justify-center gap-2 transition cursor-pointer">
+                        <!-- Zero-Barrier Guest Entry -->
+                        <button onclick="dismissWelcomeScreen()" class="w-full py-3.5 px-6 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 active:translate-y-0.5 text-emerald-200 font-extrabold text-xs sm:text-sm border border-emerald-400/30 shadow-xs flex items-center justify-center gap-2 transition cursor-pointer">
                             <span class="text-base">🏔️</span>
                             <span>Continue as Guest (No Login Required)</span>
                             <span class="text-emerald-400 font-bold">→</span>
                         </button>
-
-                        <!-- Divider from Image 2 -->
-                        <div class="flex items-center gap-3 w-full py-1">
-                            <div class="h-px bg-white/20 flex-1"></div>
-                            <span class="text-[10px] text-white/60 font-bold uppercase tracking-wider">More Login Methods</span>
-                            <div class="h-px bg-white/20 flex-1"></div>
-                        </div>
-
-                        <!-- 3 Circular Action Icons from Image 2 -->
-                        <div class="flex items-center justify-center gap-4">
-                            <button onclick="handleGoogleSignInBtnClick()" class="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white flex items-center justify-center text-lg active:scale-95 transition" title="Google Login">
-                                <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                                    <path fill="#fff" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-2h2v2zm0-4H9V7h2v5z"/>
-                                </svg>
-                            </button>
-                            <button onclick="openAuthModalWithTab('register')" class="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white flex items-center justify-center text-lg active:scale-95 transition" title="Sign Up / Username">
-                                👤
-                            </button>
-                            <button onclick="openAuthModalWithTab('email')" class="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white flex items-center justify-center text-lg active:scale-95 transition" title="Email Login">
-                                ✉️
-                            </button>
-                        </div>
                     </div>
 
-                    <!-- State B: Already Logged In (Show Continue Adventure) -->
+                    <!-- State B: Already Logged In -->
                     <div id="welcomeLoggedInActions" class="hidden space-y-3">
-                        <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 flex items-center gap-3">
-                            <div id="welcomeActiveUserImg" class="w-10 h-10 rounded-full bg-emerald-600 border border-emerald-400 flex items-center justify-center text-base font-bold text-white overflow-hidden shrink-0">
+                        <div class="p-4 rounded-2xl bg-white/10 border border-white/15 flex items-center gap-3">
+                            <div id="welcomeActiveUserImg" class="w-11 h-11 rounded-full bg-emerald-600 border-2 border-emerald-400 flex items-center justify-center text-base font-bold text-white overflow-hidden shrink-0 shadow-md">
                                 👤
                             </div>
                             <div class="text-left flex-1 min-w-0">
@@ -184,10 +173,10 @@
                             </div>
                         </div>
 
-                        <button id="welcomeStartBtn" onclick="dismissWelcomeScreen()" class="w-full py-4 px-6 rounded-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 active:scale-95 text-white font-black text-base shadow-2xl flex items-center justify-center gap-2 transition cursor-pointer">
+                        <button id="welcomeStartBtn" onclick="dismissWelcomeScreen()" class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 active:translate-y-0.5 text-white font-black text-base shadow-[0_5px_0_#064e3b] flex items-center justify-center gap-2 transition cursor-pointer">
                             <span class="text-lg">🏔️</span>
                             <span>Continue Adventure</span>
-                            <span class="text-goldaccent-300 text-base">→</span>
+                            <span class="text-amber-300 text-base">→</span>
                         </button>
 
                         <button onclick="openAuthModal()" class="w-full py-2 text-xs text-white/70 hover:text-white font-bold transition">
@@ -195,15 +184,12 @@
                         </button>
                     </div>
 
-                    <!-- Legal / Agreement Footer from Image 2 -->
-                    <div class="text-center text-[10px] text-white/60 font-medium leading-relaxed px-4 pt-1">
-                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked class="rounded accent-emerald-500 w-3 h-3">
-                            <span>Logging in confirms you have read and agreed to</span>
-                        </label>
-                        <p class="mt-0.5">
-                            <a href="javascript:void(0)" onclick="openCreditsModal()" class="text-white underline font-bold">Yakthung Pan Terms</a> & <a href="javascript:void(0)" onclick="openCreditsModal()" class="text-white underline font-bold">Privacy Policy</a>
-                        </p>
+                    <!-- Legal / Agreement Footer -->
+                    <div class="text-center text-[10px] text-white/50 font-medium leading-relaxed px-4 pt-1">
+                        <span>By signing in, you agree to our </span>
+                        <a href="javascript:void(0)" onclick="openCreditsModal()" class="text-emerald-300 underline font-bold">Terms of Service</a>
+                        <span> &amp; </span>
+                        <a href="javascript:void(0)" onclick="openCreditsModal()" class="text-emerald-300 underline font-bold">Privacy Policy</a>
                     </div>
 
                 </div>
@@ -1071,10 +1057,10 @@
                         </div>
                         <div>
                             <h2 id="authModalDynamicTitle" class="text-sm font-black tracking-tight text-white leading-none">Account & Progress Sync</h2>
-                            <p id="authModalDynamicSub" class="text-[11px] text-emerald-300/80 font-medium mt-1">Store your stars, XP & voices across devices</p>
+                            <p id="authModalDynamicSub" class="text-[11px] text-emerald-300/80 font-medium mt-1">Keep your stars, XP &amp; voices synced across devices</p>
                         </div>
                     </div>
-                    <button id="authModalCloseBtn" onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center text-sm font-bold transition active:scale-90" title="Close">
+                    <button id="authModalCloseBtn" onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center text-sm font-bold transition active:scale-90 cursor-pointer" title="Close">
                         ✕
                     </button>
                 </div>
@@ -1101,7 +1087,7 @@
 
                             <!-- Tab 1: Google Sign-In with Official Account Chooser Popup -->
                             <div id="tabContentGoogle" class="hidden pt-1 space-y-3">
-                                <button id="btnContinueGoogle" onclick="handleGoogleSignInBtnClick()" class="w-full py-4 px-6 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-extrabold text-xs sm:text-sm shadow-xl flex items-center justify-center gap-3 transition cursor-pointer">
+                                <button id="btnContinueGoogle" onclick="handleGoogleSignInBtnClick()" class="w-full py-4 px-6 rounded-2xl bg-white hover:bg-slate-50 active:translate-y-0.5 text-slate-800 font-black text-sm shadow-[0_5px_0_#cbd5e1] active:shadow-[0_1px_0_#cbd5e1] flex items-center justify-center gap-3 transition cursor-pointer">
                                     <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                                         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -1112,7 +1098,7 @@
                                 </button>
                                 <p class="text-[11px] text-slate-400 text-center">Fast, one-tap sign-in with your Google account</p>
 
-                                <!-- Error / Config Helper Banner (Appears if Google reports configuration needed) -->
+                                <!-- Error / Config Helper Banner -->
                                 <div id="googleAuthDiagnosticBanner" class="hidden p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-left text-xs space-y-1.5">
                                     <div class="font-bold text-amber-300 flex items-center gap-1.5">
                                         <span>🔑</span> <span id="googleDiagTitle">Google Setup Notice</span>
@@ -1128,13 +1114,13 @@
 
                                 <div class="space-y-2 text-left">
                                     <div>
-                                        <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">Your Google Name or Email</label>
+                                        <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">Your Name or Email</label>
                                         <div class="flex items-center bg-slate-950/80 border border-slate-700/80 rounded-2xl focus-within:border-emerald-400 transition overflow-hidden">
                                             <span class="pl-3.5 text-sm text-slate-400 select-none">👤</span>
-                                            <input id="googleNameOrEmailInput" type="text" placeholder="e.g. Numa Phung or user@gmail.com" class="w-full bg-transparent px-3 py-2.5 text-white placeholder-slate-500 text-xs font-medium focus:outline-none">
+                                            <input id="googleNameOrEmailInput" type="text" placeholder="e.g. Numa Phung or learner@gmail.com" class="w-full bg-transparent px-3 py-2.5 text-white placeholder-slate-500 text-xs font-medium focus:outline-none">
                                         </div>
                                     </div>
-                                    <button onclick="handleQuickGoogleConnectBtn()" type="button" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-95 text-white font-extrabold text-xs shadow-md transition cursor-pointer">
+                                    <button onclick="handleQuickGoogleConnectBtn()" type="button" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:translate-y-0.5 text-white font-black text-xs shadow-[0_4px_0_#064e3b] transition cursor-pointer">
                                         ✓ Connect Profile &amp; Start
                                     </button>
                                 </div>
@@ -1144,7 +1130,7 @@
                                 </div>
                             </div>
 
-                            <!-- Tab 2: Modern Email & Password Sign-In (For existing accounts) -->
+                            <!-- Tab 2: Modern Email & Password Sign-In -->
                             <div id="tabContentEmail" class="pt-1 space-y-4 text-left">
                                 <!-- Email Input -->
                                 <div>
@@ -1168,8 +1154,8 @@
                                     </div>
                                 </div>
 
-                                <!-- Big High-Contrast Action Button -->
-                                <button onclick="signInWithEmailPassword()" class="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 active:scale-95 text-white font-black text-sm shadow-xl shadow-emerald-950/60 flex items-center justify-center gap-2 transition cursor-pointer">
+                                <!-- Tactile 3D Action Button -->
+                                <button onclick="signInWithEmailPassword()" class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 active:translate-y-0.5 text-white font-black text-sm shadow-[0_5px_0_#064e3b] flex items-center justify-center gap-2 transition cursor-pointer">
                                     <span>🔐</span>
                                     <span>Log In with Email</span>
                                     <span class="text-emerald-200">→</span>
@@ -1179,23 +1165,6 @@
                                 <p class="text-center text-xs text-slate-400 pt-1">
                                     Don't have an account? <button onclick="switchAuthTab('register')" type="button" class="text-emerald-400 font-extrabold hover:underline">Create Account (Sign Up)</button>
                                 </p>
-
-                                <!-- Divider & Quick Google option -->
-                                <div class="flex items-center gap-3 pt-2">
-                                    <div class="h-px bg-white/10 flex-1"></div>
-                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Or continue with</span>
-                                    <div class="h-px bg-white/10 flex-1"></div>
-                                </div>
-
-                                <button onclick="handleGoogleSignInBtnClick()" class="w-full py-2.5 px-4 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-bold text-xs flex items-center justify-center gap-2.5 transition shadow-sm cursor-pointer">
-                                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                                    </svg>
-                                    <span>Continue with Google</span>
-                                </button>
                             </div>
 
                             <!-- Tab 3: Modern Sign Up & Choose Username -->
@@ -1207,7 +1176,7 @@
                                         <span class="pl-3.5 text-base text-slate-400 select-none">👤</span>
                                         <input id="firebaseRegUsernameInput" onkeydown="if(event.key==='Enter') signUpWithEmailPassword()" type="text" autocomplete="username" placeholder="e.g. Suman Limbu or LimbuHero" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-xs sm:text-sm font-medium focus:outline-none">
                                     </div>
-                                    <p class="text-[10px] text-slate-400 mt-1 pl-1">Your display name on the trail & leaderboards</p>
+                                    <p class="text-[10px] text-slate-400 mt-1 pl-1">Your display name on the trail &amp; leaderboards</p>
                                 </div>
 
                                 <!-- Field 2: Email Address -->
@@ -1229,10 +1198,10 @@
                                     </div>
                                 </div>
 
-                                <!-- Big High-Contrast Action Button -->
-                                <button onclick="signUpWithEmailPassword()" class="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:opacity-95 active:scale-95 text-white font-black text-sm shadow-xl shadow-emerald-950/60 flex items-center justify-center gap-2 transition cursor-pointer">
+                                <!-- Tactile 3D Action Button -->
+                                <button onclick="signUpWithEmailPassword()" class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:opacity-95 active:translate-y-0.5 text-white font-black text-sm shadow-[0_5px_0_#064e3b] flex items-center justify-center gap-2 transition cursor-pointer">
                                     <span>✨</span>
-                                    <span>Create Account & Start Learning</span>
+                                    <span>Create Account &amp; Start Learning</span>
                                     <span class="text-teal-200">→</span>
                                 </button>
 
@@ -1240,23 +1209,6 @@
                                 <p class="text-center text-xs text-slate-400 pt-1">
                                     Already have an account? <button onclick="switchAuthTab('email')" type="button" class="text-emerald-400 font-extrabold hover:underline">Log In</button>
                                 </p>
-
-                                <!-- Divider & Quick Google option -->
-                                <div class="flex items-center gap-3 pt-2">
-                                    <div class="h-px bg-white/10 flex-1"></div>
-                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Or sign up with</span>
-                                    <div class="h-px bg-white/10 flex-1"></div>
-                                </div>
-
-                                <button onclick="handleGoogleSignInBtnClick()" class="w-full py-2.5 px-4 rounded-full bg-white hover:bg-slate-100 active:scale-95 text-slate-800 font-bold text-xs flex items-center justify-center gap-2.5 transition shadow-sm cursor-pointer">
-                                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                                    </svg>
-                                    <span>Continue with Google</span>
-                                </button>
                             </div>
 
                         </div>
@@ -1272,7 +1224,7 @@
                             <div>
                                 <div class="flex items-center justify-center gap-2">
                                     <h3 id="authProfileName" class="font-black text-lg text-white">Yakthung Learner</h3>
-                                    <button onclick="toggleEditUsername(true)" class="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition" title="Change Username">
+                                    <button onclick="toggleEditUsername(true)" class="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer" title="Change Username">
                                         ✏️
                                     </button>
                                 </div>
@@ -1287,7 +1239,7 @@
                                 </div>
                                 <p id="authProfileEmail" class="text-xs text-slate-400 mt-1">learner@gmail.com</p>
                                 <span id="authProviderBadge" class="inline-block mt-2 text-[10px] font-extrabold px-3 py-1 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/30" data-i18n="signed_in_badge">
-                                    ● Account Connected & Synced
+                                    ● Account Connected &amp; Synced
                                 </span>
                             </div>
 
@@ -1300,14 +1252,14 @@
                                         <div class="text-[10px] text-slate-400">Last synced: <span id="authSyncTimestamp" class="text-white">Just now</span></div>
                                     </div>
                                 </div>
-                                <button onclick="syncCloudProgress(true)" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] shadow-sm transition active:scale-95" data-i18n="sync_now_btn">
+                                <button onclick="syncCloudProgress(true)" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] shadow-sm transition active:scale-95 cursor-pointer" data-i18n="sync_now_btn">
                                     Sync Now
                                 </button>
                             </div>
 
                             <!-- Sign Out Button -->
                             <div class="pt-2 border-t border-white/10">
-                                <button onclick="signOutUser()" class="w-full py-3 px-4 rounded-full bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-extrabold text-xs transition border border-rose-500/30 active:scale-95" data-i18n="signout_btn">
+                                <button onclick="signOutUser()" class="w-full py-3 px-4 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-extrabold text-xs transition border border-rose-500/30 active:scale-95 cursor-pointer" data-i18n="signout_btn">
                                     Sign Out
                                 </button>
                             </div>
