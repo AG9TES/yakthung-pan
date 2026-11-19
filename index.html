@@ -1085,8 +1085,8 @@
                                 </button>
                             </div>
 
-                            <!-- Tab 1: Google Sign-In with Real-Time Origin Helper & Instant Connect -->
-                            <div id="tabContentGoogle" class="pt-1 space-y-3">
+                            <!-- Tab 1: Official Google Sign-In -->
+                            <div id="tabContentGoogle" class="pt-2 space-y-4">
                                 <!-- Official Google Button -->
                                 <button id="btnContinueGoogle" onclick="handleGoogleSignInBtnClick()" class="w-full py-4 px-6 rounded-2xl bg-white hover:bg-slate-50 active:translate-y-0.5 text-slate-800 font-black text-sm shadow-[0_5px_0_#cbd5e1] active:shadow-[0_1px_0_#cbd5e1] flex items-center justify-center gap-3 transition cursor-pointer relative">
                                     <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -1096,46 +1096,30 @@
                                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
                                     </svg>
                                     <span>Continue with Google</span>
-                                    <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">1-Tap</span>
+                                    <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">Official</span>
                                 </button>
-                                <p class="text-[11px] text-slate-400 text-center">Fast, official sign-in with your Google account</p>
+                                <p class="text-[11px] text-slate-400 text-center">Fast, official web sign-in with your Google account</p>
 
-                                <!-- Hidden Diagnostics Container (Retains element IDs for JS parity without showing in UI) -->
-                                <div id="googleAuthDiagnosticBanner" class="hidden" style="display:none !important;">
-                                    <div><span id="googleDiagTitle"></span></div>
-                                    <div><span id="googleDiagMessage"></span></div>
-                                    <div><span id="googleCurrentOriginLabel"></span></div>
-                                </div>
-
-                                <!-- Divider -->
-                                <div class="relative flex items-center my-3">
-                                    <div class="flex-grow border-t border-slate-700/60"></div>
-                                    <span class="flex-shrink mx-3 text-[10px] font-bold text-emerald-300 uppercase tracking-wider">or 1-Tap Instant Google Connect</span>
-                                    <div class="flex-grow border-t border-slate-700/60"></div>
-                                </div>
-
-                                <!-- Instant Google Profile Connect Card -->
-                                <div class="p-3.5 rounded-2xl bg-slate-950/80 border border-emerald-500/30 text-left space-y-2.5">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">Google Account Email</span>
-                                        <span class="text-[9px] text-slate-400 font-medium">Bypasses web popup blocks</span>
+                                <!-- Trust & Security Info Card -->
+                                <div class="p-4 rounded-2xl bg-slate-900/80 border border-emerald-500/20 text-left space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xs">🔒</div>
+                                        <div class="text-xs font-bold text-emerald-300">Official Google OAuth Verification</div>
                                     </div>
-                                    <div class="relative flex items-center bg-slate-900 border border-slate-700 rounded-xl focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/20 transition overflow-hidden">
-                                        <span class="pl-3 text-slate-400 text-sm select-none">✉️</span>
-                                        <input id="googleNameOrEmailInput" type="text" placeholder="ag9tes.yt@gmail.com" value="ag9tes.yt@gmail.com" onkeydown="if(event.key==='Enter') handleQuickGoogleConnectBtn()" class="w-full bg-transparent px-3 py-2.5 text-white placeholder-slate-500 text-xs font-medium focus:outline-none">
+                                    <div class="text-[11px] text-slate-300/90 leading-relaxed">
+                                        Authenticates through Google's official security servers. Automatically synchronizes your 21 mountain trail levels, stars, XP, and audio recordings.
                                     </div>
-                                    <button onclick="handleQuickGoogleConnectBtn()" type="button" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:translate-y-0.5 text-white font-black text-xs shadow-[0_4px_0_#064e3b] transition cursor-pointer flex items-center justify-center gap-2">
-                                        <span>⚡</span>
-                                        <span>Instant Connect as Google Account</span>
-                                    </button>
+                                    <div class="pt-1 flex items-center gap-2">
+                                        <div class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-slate-300">✓ Multi-Device Sync</div>
+                                        <div class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-slate-300">✓ Progress Backup</div>
+                                        <div class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-slate-300">✓ Cloud Restored</div>
+                                    </div>
                                 </div>
 
-                                <div class="pt-1 text-center text-xs text-slate-400">
-                                    Prefer email password? <button onclick="switchAuthTab('email')" type="button" class="text-emerald-400 font-extrabold hover:underline cursor-pointer">Log In with Email</button>
+                                <div class="pt-2 text-center text-xs text-slate-400">
+                                    <div>Prefer email? <button onclick="switchAuthTab('email')" type="button" class="text-emerald-400 font-extrabold hover:underline cursor-pointer">Log In with Email</button></div>
                                 </div>
-                            </div>
-
-                            <!-- Tab 2: Modern Email & Password Sign-In -->
+                            </div>\n                            <!-- Tab 2: Modern Email & Password Sign-In -->
                             <div id="tabContentEmail" class="hidden pt-1 space-y-4 text-left">
                                 <!-- Email Input -->
                                 <div>

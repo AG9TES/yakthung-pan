@@ -303,162 +303,20 @@ if (typeof window !== 'undefined') {
     window.handleGoogleIdentityCredentialResponse = handleGoogleIdentityCredentialResponse;
 }
 
-// 1. Unified Google Authentication Handler (Native SDK on Android, Web GIS/OAuth on Web)
+// 1. Unified Google Authentication Handler (Official Google OAuth Flow)
 async function handleGoogleSignInBtnClick() {
-    // A. Native Android Google Account Picker (Native OS System Bottom Sheet)
-    if (typeof window !== 'undefined' && window.AndroidNativeGoogleAuth && typeof window.AndroidNativeGoogleAuth.promptNativeGoogleSignIn === 'function') {
-        if (typeof showToast === 'function') {
-            showToast('Opening Google Account Picker...', '⏳');
-        }
-        try {
-            window.AndroidNativeGoogleAuth.promptNativeGoogleSignIn();
-            return;
-        } catch (e) {
-            console.warn('[Auth] Native Google Sign-In invocation error:', e);
-        }
-    }
-
-    // B. Web-Based Firebase Google OAuth (Popup Flow)
     await signInWithGoogleFirebase();
 }
-
-/**
- * Native Android Google Sign-In Success Callback
- * Receives the verified Google account details directly from Google Play Services SDK.
- */
-async function onNativeGoogleSignInSuccess(email, name, photoUrl, idToken) {
-    if (!email && !idToken) return;
-    console.log('[Auth] Native Google Sign-In success from Google Play Services:', email);
-
-    // 1. Authenticate with Firebase using official Google ID Token
-    if (isFirebaseAvailable() && firebaseAuth && idToken && window.firebase && window.firebase.auth && window.firebase.auth.GoogleAuthProvider) {
-        try {
-            const credential = window.firebase.auth.GoogleAuthProvider.credential(idToken);
-            const userCredential = await firebaseAuth.signInWithCredential(credential);
-            if (userCredential && userCredential.user) {
-                if (typeof showToast === 'function') {
-                    showToast(`Signed in as ${userCredential.user.displayName || email}!`, '✅');
-                }
-                handleFirebaseAuthStateChanged(userCredential.user);
-                return;
-            }
-        } catch (e) {
-            console.warn('[Auth] Firebase credential exchange warning:', e);
-        }
-    }
-
-    // 2. Set up learner profile from native Google Sign-In account details
-    const cleanName = name || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Yakthung Learner';
-    const profile = {
-        id: 'g_' + Math.abs(hashCode(email.toLowerCase())),
-        name: cleanName,
-        username: cleanName,
-        email: email,
-        picture: photoUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanName)}`,
-        provider: 'google',
-        isLocalAccount: true,
-        lastSynced: new Date().toISOString()
-    };
-    applySignedInUser(profile);
-    saveLocalAccountRecord(profile.name, profile.email, 'google_native_sdk', profile.id);
-    if (typeof showToast === 'function') {
-        showToast(`Welcome, ${profile.name}! Signed in with Google.`, '✅');
-    }
-}
 if (typeof window !== 'undefined') {
-    window.onNativeGoogleSignInSuccess = onNativeGoogleSignInSuccess;
+    window.handleGoogleSignInBtnClick = handleGoogleSignInBtnClick;
 }
 
 /**
- * Native Android Google Sign-In Error Callback
- * Handles errors and cancellations from Google Play Services.
+ * Official Firebase Google OAuth Sign-In Flow
+ * Opens the official Google web account selector popup (accounts.google.com).
+ * Authenticates with Firebase and restores learner cloud progress.
  */
-function onNativeGoogleSignInError(statusCode) {
-    console.warn('[Auth] Native Google Sign-In error code:', statusCode);
-    if (statusCode === 12501) {
-        // User cancelled the account picker sheet
-        if (typeof showToast === 'function') showToast('Google sign-in cancelled', 'ℹ️');
-    } else if (statusCode === 10 || statusCode === 12500) {
-        // Developer configuration error (e.g. SHA-1 fingerprint not yet added in Firebase Console)
-        if (typeof showToast === 'function') {
-            showToast('Note: Add SHA-1 in Firebase Console for this app.', '⚠️');
-        }
-        promptQuickGoogleConnect();
-    } else {
-        if (typeof showToast === 'function') {
-            showToast(`Google Sign-In notice (${statusCode})`, '⚠️');
-        }
-    }
-}
-if (typeof window !== 'undefined') {
-    window.onNativeGoogleSignInError = onNativeGoogleSignInError;
-}
-
-/**
- * Native Android Google Account Chooser & 1-Tap Quick Connect Callback
- * Called by Android MainActivity or 1-Tap Quick Connect button.
- */
-function onNativeGoogleAccountSelected(email, customName) {
-    if (!email) return;
-    console.log('[Auth] Google account chosen:', email);
-    let name = customName || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Yakthung Learner';
-    const profile = {
-        id: 'g_' + Math.abs(hashCode(email.toLowerCase())),
-        name: name,
-        username: name,
-        email: email,
-        picture: 'https://api.dicebear.com/7.x/bottts/svg?seed=' + encodeURIComponent(name),
-        provider: 'google',
-        isLocalAccount: true,
-        lastSynced: new Date().toISOString()
-    };
-    applySignedInUser(profile);
-    saveLocalAccountRecord(name, email, 'google_device_auth', profile.id);
-    if (typeof showToast === 'function') {
-        showToast(`Welcome, ${name}! Signed in with Google.`, '✅');
-    }
-}
-if (typeof window !== 'undefined') {
-    window.onNativeGoogleAccountSelected = onNativeGoogleAccountSelected;
-}
-
-function handleQuickGoogleConnectBtn() {
-    const input = document.getElementById('googleNameOrEmailInput');
-    let val = input ? input.value.trim() : '';
-    if (!val) {
-        val = localStorage.getItem('yakthung_last_google_email') || 'ag9tes.yt@gmail.com';
-        if (input) input.value = val;
-    }
-    let email = val.includes('@') ? val.toLowerCase() : (val.toLowerCase().replace(/\s+/g, '.') + '@gmail.com');
-    let name = val.includes('@') ? val.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : val;
-    try { localStorage.setItem('yakthung_last_google_email', email); } catch (e) {}
-    onNativeGoogleAccountSelected(email, name);
-}
-if (typeof window !== 'undefined') {
-    window.handleQuickGoogleConnectBtn = handleQuickGoogleConnectBtn;
-}
-
-function promptQuickGoogleConnect() {
-    openAuthModalWithTab('google');
-    const diagBanner = document.getElementById('googleAuthDiagnosticBanner');
-    const diagTitle = document.getElementById('googleDiagTitle');
-    const diagMsg = document.getElementById('googleDiagMessage');
-    if (diagBanner && diagTitle && diagMsg) {
-        diagTitle.textContent = 'Google Web Sign-In Notice';
-        diagMsg.textContent = 'Google blocks direct OAuth in embedded app browsers. You can use 1-Tap Instant Connect below or Log in with Email!';
-        diagBanner.classList.remove('hidden');
-    }
-    const input = document.getElementById('googleNameOrEmailInput');
-    if (input) setTimeout(() => input.focus(), 300);
-}
-if (typeof window !== 'undefined') {
-    window.promptQuickGoogleConnect = promptQuickGoogleConnect;
-}
-
 async function signInWithGoogleFirebase() {
-    const diagBanner = document.getElementById('googleAuthDiagnosticBanner');
-    if (diagBanner) diagBanner.classList.add('hidden');
-
     // Ensure Firebase service is initialized
     if (!isFirebaseAvailable()) {
         initFirebaseService();
@@ -475,52 +333,48 @@ async function signInWithGoogleFirebase() {
             provider.setCustomParameters({ prompt: 'select_account' });
 
             if (typeof showToast === 'function') {
-                showToast('Connecting to Google...', '⏳');
+                showToast('Opening official Google Sign-In...', '⏳');
             }
 
             try {
                 const res = await firebaseAuth.signInWithPopup(provider);
                 if (res && res.user) {
-                    if (typeof showToast === 'function') showToast(`Signed in as ${res.user.displayName || res.user.email}!`, '✅');
+                    if (typeof showToast === 'function') {
+                        showToast(`Signed in as ${res.user.displayName || res.user.email}!`, '✅');
+                    }
                     handleFirebaseAuthStateChanged(res.user);
                     return;
                 }
             } catch (popupErr) {
-                console.warn('[Auth] Google popup error or closed:', popupErr);
-                handleGoogleAuthError(popupErr);
-                return;
+                console.warn('[Auth] Popup notice:', popupErr);
+                if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
+                    if (typeof firebaseAuth.signInWithRedirect === 'function') {
+                        await firebaseAuth.signInWithRedirect(provider);
+                        return;
+                    }
+                }
+                throw popupErr;
             }
         } catch (error) {
-            console.warn('[Auth] Google OAuth exception:', error);
-            handleGoogleAuthError(error);
-            return;
+            console.error('[Google Sign-In Error]:', error);
+            if (typeof showToast === 'function') {
+                if (error.code === 'auth/popup-closed-by-user') {
+                    showToast('Google Sign-In closed', 'ℹ️');
+                } else if (error.code === 'auth/unauthorized-domain') {
+                    showToast('Domain not authorized in Firebase Console', '⚠️');
+                } else {
+                    showToast(error.message || 'Google Sign-In error', '⚠️');
+                }
+            }
         }
     } else {
-        handleGoogleAuthError({ code: 'firebase-unavailable', message: 'Firebase service is initializing or offline. Connect instantly below.' });
+        if (typeof showToast === 'function') {
+            showToast('Firebase Authentication is initializing...', '⏳');
+        }
     }
 }
-
-function handleGoogleAuthError(error) {
-    const errCode = error ? (error.code || '') : '';
-    console.warn('[Google Auth]:', errCode, error);
-
-    openAuthModalWithTab('google');
-
-    if (typeof showToast === 'function') {
-        if (errCode === 'auth/popup-closed-by-user') {
-            showToast('Sign-in cancelled. You can also connect instantly below!', 'ℹ️');
-        } else {
-            showToast('Connect with Google below to sync your progress!', '✨');
-        }
-    }
-
-    const input = document.getElementById('googleNameOrEmailInput');
-    if (input) {
-        if (!input.value) {
-            input.value = localStorage.getItem('yakthung_last_google_email') || 'ag9tes.yt@gmail.com';
-        }
-        setTimeout(() => input.focus(), 300);
-    }
+if (typeof window !== 'undefined') {
+    window.signInWithGoogleFirebase = signInWithGoogleFirebase;
 }
 
 function copyCurrentOrigin() {
@@ -1299,16 +1153,7 @@ function switchAuthTab(tabId) {
         if (titleEl) titleEl.textContent = 'Continue with Google';
         if (subEl) subEl.textContent = 'Fast, official sign-in with your Google account';
         
-        const currentOrigin = (typeof window !== 'undefined' && window.location) 
-            ? (window.location.origin || (window.location.protocol + '//' + window.location.host)) 
-            : 'http://localhost:8080';
-        const originLabel = document.getElementById('googleCurrentOriginLabel');
-        if (originLabel) originLabel.textContent = currentOrigin;
 
-        const emailInput = document.getElementById('googleNameOrEmailInput');
-        if (emailInput && !emailInput.value) {
-            emailInput.value = localStorage.getItem('yakthung_last_google_email') || 'ag9tes.yt@gmail.com';
-        }
     }
 }
 
@@ -1360,7 +1205,7 @@ var ADMIN_USERS_STORAGE_KEY = 'yakthung_admin_learners';
 function getDeviceSummary() {
     if (typeof navigator === 'undefined') return 'Web Browser';
     const ua = navigator.userAgent;
-    if (ua.includes('YakthungPan') || (typeof window !== 'undefined' && window.AndroidNativeGoogleAuth)) {
+    if (ua.includes('YakthungPan')) {
         return 'Android APK';
     } else if (/Android/i.test(ua)) {
         return 'Android Mobile';
