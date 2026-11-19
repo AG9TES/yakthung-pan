@@ -59,6 +59,11 @@ function initAuthSystem() {
         if (typeof window !== 'undefined') window.currentUser = null;
     }
 
+    // Immediately synchronize progress with active user or guest state
+    if (typeof loadProgress === 'function') {
+        loadProgress();
+    }
+
     updateAuthHUD();
     initFirebaseService();
     initGoogleIdentityServices();
@@ -169,6 +174,10 @@ async function handleFirebaseAuthStateChanged(user) {
         if (typeof window !== 'undefined') window.currentUser = profile;
         try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser)); } catch (e) {}
 
+        if (typeof switchUserProgress === 'function') {
+            switchUserProgress(profile);
+        }
+
         await restoreCloudProgress(user.email || user.uid);
         updateAuthHUD();
         updateAuthUI();
@@ -194,6 +203,9 @@ async function handleFirebaseAuthStateChanged(user) {
             currentUser = null;
             if (typeof window !== 'undefined') window.currentUser = null;
             try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch (e) {}
+            if (typeof switchUserProgress === 'function') {
+                switchUserProgress(null);
+            }
             updateAuthHUD();
             updateAuthUI();
         }
@@ -784,7 +796,14 @@ function applySignedInUser(profile) {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
     } catch (e) {}
 
+    // 1. Immediately switch local progress context to this user
+    if (typeof switchUserProgress === 'function') {
+        switchUserProgress(profile);
+    }
+
     const accountIdentifier = (profile.email || profile.id || 'learner').toLowerCase().trim();
+    
+    // 2. Restore cloud progress from Firestore / Cloud Hub
     restoreCloudProgress(accountIdentifier);
 
     updateAuthHUD();
@@ -813,56 +832,126 @@ async function restoreCloudProgress(accountIdentifier) {
     if (!accountIdentifier) return;
     const cleanId = String(accountIdentifier).toLowerCase().trim();
     const cloudKey = getAccountCloudKey(cleanId);
-    console.log('[Cloud Progress] Restoring progress for:', cleanId, 'Key:', cloudKey);
+    const userDocId = cleanId.replace(/[^a-z0-9]/g, '_');
+    console.log('[Cloud Progress] Restoring progress for:', cleanId, 'DocID:', userDocId);
 
-    // 1. Check local device backup first
-    try {
-        const localKey1 = `yakthung_cloud_user_${cleanId}`;
-        const localKey2 = `yakthung_cloud_user_${cloudKey}`;
-        const saved = localStorage.getItem(localKey1) || localStorage.getItem(localKey2);
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed && (Number(parsed.unlockedLevel) > 1 || Number(parsed.xp) > 0)) {
-                mergeProgress(parsed);
-            }
-        }
-    } catch (e) {}
+    let cloudData = null;
 
-    // 2. Fetch authoritative cloud data from persistent Cloud Progress Hub
-    try {
-        const res = await fetch(CLOUD_PROGRESS_URL, { cache: 'no-store' });
-        if (res.ok) {
-            const json = await res.json();
-            const hubData = json.data || {};
-            const users = hubData.users || {};
-
-            let foundCloud = users[cloudKey] || users[cleanId];
-            if (!foundCloud) {
-                for (const u of Object.values(users)) {
-                    if (u && u.email && u.email.toLowerCase().trim() === cleanId) {
-                        foundCloud = u;
-                        break;
+    // 1. Primary: Query Google Firebase Firestore (Permanent Cloud DB)
+    if (firestoreDb) {
+        try {
+            // Check doc by sanitized email/id
+            const docRef = firestoreDb.collection('user_progress').doc(userDocId);
+            const snap = await docRef.get();
+            if (snap.exists) {
+                const data = snap.data();
+                if (data && (Number(data.unlockedLevel) > 1 || Number(data.xp) > 0 || (data.levelStars && Object.keys(data.levelStars).length > 0))) {
+                    cloudData = data;
+                    console.log('[Cloud Progress] Found existing progress in Firestore:', data);
+                }
+            } else if (currentUser && currentUser.id && currentUser.id !== userDocId) {
+                const altRef = firestoreDb.collection('user_progress').doc(currentUser.id);
+                const altSnap = await altRef.get();
+                if (altSnap.exists) {
+                    const data = altSnap.data();
+                    if (data && (Number(data.unlockedLevel) > 1 || Number(data.xp) > 0 || (data.levelStars && Object.keys(data.levelStars).length > 0))) {
+                        cloudData = data;
                     }
                 }
             }
-
-            if (foundCloud) {
-                console.log('[Cloud Progress] Found cloud progress on Hub:', foundCloud);
-                mergeProgress(foundCloud);
-                if (typeof showToast === 'function') {
-                    showToast(`Progress restored! You are on Level ${progress.unlockedLevel} (${progress.xp} XP)`, '☁️');
-                }
-                return;
-            }
+        } catch (err) {
+            console.warn('[Cloud Progress] Firestore fetch note:', err);
         }
-    } catch (e) {
-        console.warn('[Cloud Progress] Cloud restore fetch notice:', e);
     }
 
-    // 3. If no cloud data exists yet, but local device has progress (e.g. played as guest before signing in),
-    // immediately upload local progress to the user's Google account!
-    if (progress && (Number(progress.unlockedLevel) > 1 || Number(progress.xp) > 0)) {
-        syncCloudProgress(false);
+    // 2. Secondary: Check local user-specific cache (if played on this device before)
+    if (!cloudData) {
+        try {
+            const userStorageKey = (typeof getProgressStorageKey === 'function') ? getProgressStorageKey() : `yakthung_progress_user_${userDocId}`;
+            const localSaved = localStorage.getItem(userStorageKey);
+            if (localSaved) {
+                const parsed = JSON.parse(localSaved);
+                if (parsed && (Number(parsed.unlockedLevel) > 1 || Number(parsed.xp) > 0 || (parsed.levelStars && Object.keys(parsed.levelStars).length > 0))) {
+                    cloudData = parsed;
+                }
+            }
+        } catch (e) {}
+    }
+
+    // 3. Fallback: Check Cloud Progress Hub
+    if (!cloudData) {
+        try {
+            const res = await fetch(CLOUD_PROGRESS_URL, { cache: 'no-store' });
+            if (res.ok) {
+                const json = await res.json();
+                const hubData = json.data || {};
+                const users = hubData.users || {};
+                let foundCloud = users[cloudKey] || users[cleanId] || users[userDocId];
+                if (!foundCloud) {
+                    for (const u of Object.values(users)) {
+                        if (u && u.email && u.email.toLowerCase().trim() === cleanId) {
+                            foundCloud = u;
+                            break;
+                        }
+                    }
+                }
+                if (foundCloud && (Number(foundCloud.unlockedLevel) > 1 || Number(foundCloud.xp) > 0)) {
+                    cloudData = foundCloud;
+                }
+            }
+        } catch (e) {}
+    }
+
+    // 4. Decision: Returning User vs Brand New User
+    if (cloudData) {
+        // Returning User: Restore exact progress!
+        console.log('[Cloud Progress] Restoring progress for returning user:', cloudData);
+        mergeProgress(cloudData);
+        if (typeof showToast === 'function') {
+            showToast(`Welcome back! Progress restored to Level ${progress.unlockedLevel} (${progress.xp} XP)`, '☁️');
+        }
+    } else {
+        // Brand New User: Must start fresh as NEW!
+        console.log('[Cloud Progress] Brand new user. Initializing clean Level 1 start.');
+        if (typeof getDefaultProgress === 'function') {
+            progress = getDefaultProgress();
+        } else {
+            progress = {
+                unlockedLevel: 1,
+                levelStars: {},
+                masteredChars: [],
+                xp: 0,
+                streak: 1,
+                lastActiveDate: new Date().toDateString()
+            };
+        }
+
+        const userKey = (typeof getProgressStorageKey === 'function') ? getProgressStorageKey() : `yakthung_progress_user_${userDocId}`;
+        try {
+            localStorage.setItem(userKey, JSON.stringify(progress));
+        } catch (e) {}
+
+        if (typeof updateHudDisplay === 'function') updateHudDisplay();
+        if (typeof renderWindingMap === 'function') renderWindingMap(1);
+        if (typeof updateWelcomeScreenUI === 'function') updateWelcomeScreenUI();
+
+        // Create initial clean record in Firestore
+        if (firestoreDb) {
+            try {
+                firestoreDb.collection('user_progress').doc(userDocId).set({
+                    unlockedLevel: 1,
+                    levelStars: {},
+                    xp: 0,
+                    streak: 1,
+                    masteredChars: [],
+                    email: cleanId,
+                    name: (currentUser && (currentUser.name || currentUser.username)) || 'Learner',
+                    provider: (currentUser && currentUser.provider) || 'google',
+                    createdAt: window.firebase && window.firebase.firestore ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString(),
+                    lastActive: new Date().toISOString()
+                }, { merge: true }).catch(() => {});
+            } catch (e) {}
+        }
     }
 }
 
@@ -897,16 +986,15 @@ function mergeProgress(cloudProgress) {
         progress.masteredChars = Array.from(new Set([...progress.masteredChars, ...cloudProgress.masteredChars]));
     }
 
-    // Persist immediately to localStorage
-    if (typeof saveProgress === 'function') {
-        saveProgress();
-    }
-    if (typeof updateHudDisplay === 'function') {
-        updateHudDisplay();
-    }
-    if (typeof renderWindingMap === 'function') {
-        renderWindingMap();
-    }
+    // Persist immediately to user's scoped storage key
+    const userKey = (typeof getProgressStorageKey === 'function') ? getProgressStorageKey() : 'yakthung_pan_final_v1';
+    try {
+        localStorage.setItem(userKey, JSON.stringify(progress));
+    } catch (e) {}
+
+    if (typeof updateHudDisplay === 'function') updateHudDisplay();
+    if (typeof renderWindingMap === 'function') renderWindingMap();
+    if (typeof updateWelcomeScreenUI === 'function') updateWelcomeScreenUI();
 }
 
 async function syncCloudProgress(notify = true) {
@@ -917,10 +1005,13 @@ async function syncCloudProgress(notify = true) {
 
     const accountIdentifier = (currentUser.email || currentUser.id || 'learner').toLowerCase().trim();
     const cloudKey = getAccountCloudKey(accountIdentifier);
+    const userDocId = accountIdentifier.replace(/[^a-z0-9]/g, '_');
 
     currentUser.lastSynced = new Date().toISOString();
+    const userKey = (typeof getProgressStorageKey === 'function') ? getProgressStorageKey() : `yakthung_progress_user_${userDocId}`;
     try {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
+        localStorage.setItem(userKey, JSON.stringify(progress));
         localStorage.setItem(`yakthung_cloud_user_${currentUser.id}`, JSON.stringify(progress));
         if (currentUser.email) {
             localStorage.setItem(`yakthung_cloud_user_${currentUser.email.toLowerCase().trim()}`, JSON.stringify(progress));
@@ -946,10 +1037,24 @@ async function syncCloudProgress(notify = true) {
         email: currentUser.email || '',
         name: currentUser.name || currentUser.username || 'Yakthung Learner',
         provider: currentUser.provider || 'google',
-        syncedAt: new Date().toISOString()
+        lastActive: new Date().toISOString()
     };
 
-    // Save to Cloud Hub (Guaranteed 100% persistent across uninstalls and devices)
+    // 1. Save to Google Firebase Firestore (Permanent cloud persistence)
+    if (firestoreDb) {
+        try {
+            firestoreDb.collection('user_progress').doc(userDocId).set({
+                ...payload,
+                updatedAt: window.firebase && window.firebase.firestore ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
+            }, { merge: true }).then(() => {
+                console.log('[Cloud Progress] Backed up to Firestore for:', userDocId, 'Level:', currentUnlocked);
+            }).catch(err => {
+                console.warn('[Cloud Progress] Firestore set note:', err);
+            });
+        } catch (e) {}
+    }
+
+    // 2. Secondary backup to Cloud Progress Hub (failsafe)
     saveProgressToCloudHub(cloudKey, payload);
 
     updateAuthUI();
@@ -1009,13 +1114,18 @@ async function signOutUser() {
     if (typeof window !== 'undefined') window.currentUser = null;
     try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch (e) {}
 
+    // Switch back to clean guest progress
+    if (typeof switchUserProgress === 'function') {
+        switchUserProgress(null);
+    }
+
     updateAuthHUD();
     updateAuthUI();
 
-    if (typeof showToast === 'function') showToast('Signed out. Please sign in to continue.', '👋');
+    if (typeof showToast === 'function') showToast('Signed out. Switched to guest mode.', '👋');
 
-    // Immediately show mandatory login gate
-    openAuthModal(true);
+    // Show auth modal for new sign in
+    openAuthModal(false);
 }
 
 // ---------------------------------------------------------------------

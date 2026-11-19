@@ -1,9 +1,11 @@
 /**
  * Yakthung Pan • Persistent State & Developer Testing Mode
- * Handles localStorage persistence, daily streaks, XP, HUD, and Dev Mode toggles.
+ * Handles user-scoped persistence, cloud syncing, daily streaks, XP, HUD, and Dev Mode toggles.
+ * Ensures each user account owns its own progress, while brand new users start fresh at Level 1.
  */
 
-const STORAGE_KEY = 'yakthung_pan_final_v1';
+const LEGACY_STORAGE_KEY = 'yakthung_pan_final_v1';
+const STORAGE_KEY = LEGACY_STORAGE_KEY;
 
 let devMode = false; // Normal adventure progression by default
 try {
@@ -13,14 +15,37 @@ try {
     devMode = false;
 }
 
-let progress = {
-    unlockedLevel: 1,
-    levelStars: {},         // { 1: 3, 2: 2, ... }
-    masteredChars: [],      // up to 45 traceable items
-    xp: 0,
-    streak: 1,
-    lastActiveDate: new Date().toDateString()
-};
+function getDefaultProgress() {
+    return {
+        unlockedLevel: 1,
+        levelStars: {},         // { 1: 3, 2: 2, ... }
+        masteredChars: [],      // up to 45 traceable items
+        xp: 0,
+        streak: 1,
+        lastActiveDate: new Date().toDateString()
+    };
+}
+
+function getProgressStorageKey() {
+    try {
+        let user = null;
+        if (typeof currentUser !== 'undefined' && currentUser) {
+            user = currentUser;
+        } else if (typeof window !== 'undefined' && window.currentUser) {
+            user = window.currentUser;
+        } else if (typeof localStorage !== 'undefined') {
+            const raw = localStorage.getItem('yakthung_auth_profile');
+            if (raw) user = JSON.parse(raw);
+        }
+        if (user) {
+            const id = (user.email || user.id || user.uid || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
+            if (id) return 'yakthung_progress_user_' + id;
+        }
+    } catch (e) {}
+    return 'yakthung_progress_guest';
+}
+
+let progress = getDefaultProgress();
 
 // Computes the actual unlocked level based on progress and stars (never downscales player progress)
 function getEffectiveUnlockedLevel() {
@@ -53,10 +78,20 @@ function getEffectiveUnlockedLevel() {
 
 function loadProgress() {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const key = getProgressStorageKey();
+        let raw = localStorage.getItem(key);
+
+        // One-time fallback ONLY for guest if legacy key exists and guest key has not been written
+        if (!raw && key === 'yakthung_progress_guest') {
+            const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+            if (legacyRaw) {
+                raw = legacyRaw;
+            }
+        }
+
         if (raw) {
             const parsed = JSON.parse(raw);
-            progress = { ...progress, ...parsed };
+            progress = { ...getDefaultProgress(), ...parsed };
 
             const today = new Date().toDateString();
             if (progress.lastActiveDate !== today) {
@@ -66,24 +101,29 @@ function loadProgress() {
                 saveProgress();
             }
         } else {
-            saveProgress();
+            // Brand new user or clean guest: start fresh at Level 1!
+            progress = getDefaultProgress();
         }
 
         // Self-heal: ensure unlockedLevel is at least getEffectiveUnlockedLevel() without downgrading
         const effective = getEffectiveUnlockedLevel();
         progress.unlockedLevel = Math.max(Number(progress.unlockedLevel) || 1, effective);
         progress.lastActiveDate = new Date().toDateString();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+        if (raw) {
+            localStorage.setItem(key, JSON.stringify(progress));
+        }
     } catch (e) {
         console.warn('Could not read localStorage:', e);
+        progress = getDefaultProgress();
     }
     updateHudDisplay();
 }
 
 function saveProgress() {
     try {
+        const key = getProgressStorageKey();
         progress.lastActiveDate = new Date().toDateString();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+        localStorage.setItem(key, JSON.stringify(progress));
     } catch (e) {
         console.warn('Could not save localStorage:', e);
     }
@@ -93,6 +133,29 @@ function saveProgress() {
     if (typeof syncCloudProgress === 'function') {
         try { syncCloudProgress(false); } catch (e) {}
     }
+}
+
+function switchUserProgress(newProfile) {
+    if (newProfile) {
+        currentUser = newProfile;
+        if (typeof window !== 'undefined') window.currentUser = newProfile;
+    } else {
+        currentUser = null;
+        if (typeof window !== 'undefined') window.currentUser = null;
+    }
+
+    loadProgress();
+    if (typeof updateHudDisplay === 'function') updateHudDisplay();
+    if (typeof renderWindingMap === 'function') renderWindingMap();
+    if (typeof updateWelcomeScreenUI === 'function') updateWelcomeScreenUI();
+}
+
+if (typeof window !== 'undefined') {
+    window.getDefaultProgress = getDefaultProgress;
+    window.getProgressStorageKey = getProgressStorageKey;
+    window.loadProgress = loadProgress;
+    window.saveProgress = saveProgress;
+    window.switchUserProgress = switchUserProgress;
 }
 
 function updateHudDisplay() {
