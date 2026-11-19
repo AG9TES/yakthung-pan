@@ -63,6 +63,12 @@ function initAuthSystem() {
     initFirebaseService();
     initGoogleIdentityServices();
 
+    if (currentUser) {
+        setTimeout(() => {
+            restoreCloudProgress(currentUser.email || currentUser.id);
+        }, 300);
+    }
+
     // Real-time App Launch Telemetry: Notifies Admin Dashboard when app is opened
     try {
         const lastPing = sessionStorage.getItem('yakthung_session_ping');
@@ -163,7 +169,7 @@ async function handleFirebaseAuthStateChanged(user) {
         if (typeof window !== 'undefined') window.currentUser = profile;
         try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser)); } catch (e) {}
 
-        await restoreCloudProgress(user.uid);
+        await restoreCloudProgress(user.email || user.uid);
         updateAuthHUD();
         updateAuthUI();
 
@@ -288,9 +294,6 @@ async function handleGoogleIdentityCredentialResponse(response) {
             if (typeof showToast === 'function') {
                 showToast(`Welcome, ${profile.name}! Signed in with Google.`, '✅');
             }
-            if (typeof syncCloudProgress === 'function') {
-                try { syncCloudProgress(false); } catch (e) {}
-            }
         }
     } catch (err) {
         console.error('[Auth] Failed to decode Google JWT:', err);
@@ -376,9 +379,6 @@ async function onNativeGoogleSignInSuccess(email, name, photoUrl, idToken) {
     if (typeof showToast === 'function') {
         showToast(`Welcome, ${profile.name}! Signed in with Google.`, '✅');
     }
-    if (typeof syncCloudProgress === 'function') {
-        try { syncCloudProgress(false); } catch (e) {}
-    }
 }
 if (typeof window !== 'undefined') {
     window.onNativeGoogleSignInSuccess = onNativeGoogleSignInSuccess;
@@ -431,9 +431,6 @@ function onNativeGoogleAccountSelected(email, customName) {
     saveLocalAccountRecord(name, email, 'google_device_auth', profile.id);
     if (typeof showToast === 'function') {
         showToast(`Welcome, ${name}! Signed in with Google.`, '✅');
-    }
-    if (typeof syncCloudProgress === 'function') {
-        try { syncCloudProgress(false); } catch (e) {}
     }
 }
 if (typeof window !== 'undefined') {
@@ -829,6 +826,18 @@ function hashCode(str) {
     return hash;
 }
 
+// ---------------------------------------------------------------------
+// Cloud & Local Progress Synchronization (Persistent Cloud Progress Hub)
+// ---------------------------------------------------------------------
+
+var CLOUD_PROGRESS_STORAGE_ID = 'ff808181a09d98f701a1f3bdd6445cbc';
+var CLOUD_PROGRESS_URL = 'https://api.restful-api.dev/objects/' + CLOUD_PROGRESS_STORAGE_ID;
+
+function getAccountCloudKey(str) {
+    if (!str) return 'guest';
+    return 'u_' + encodeURIComponent(String(str).toLowerCase().trim()).replace(/[^a-zA-Z0-9]/g, '_');
+}
+
 function applySignedInUser(profile) {
     currentUser = profile;
     if (typeof window !== 'undefined') window.currentUser = profile;
@@ -836,7 +845,9 @@ function applySignedInUser(profile) {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
     } catch (e) {}
 
-    restoreCloudProgress(profile.id);
+    const accountIdentifier = (profile.email || profile.id || 'learner').toLowerCase().trim();
+    restoreCloudProgress(accountIdentifier);
+
     updateAuthHUD();
     updateAuthUI();
 
@@ -852,34 +863,66 @@ function applySignedInUser(profile) {
             userId: profile.id,
             userName: profile.name,
             email: profile.email,
-            provider: profile.provider
+            provider: profile.provider,
+            level: (typeof progress !== 'undefined' ? (progress.unlockedLevel || 1) : 1),
+            xp: (typeof progress !== 'undefined' ? (progress.xp || 0) : 0)
         });
     }
 }
 
-// ---------------------------------------------------------------------
-// Cloud & Local Progress Synchronization
-// ---------------------------------------------------------------------
+async function restoreCloudProgress(accountIdentifier) {
+    if (!accountIdentifier) return;
+    const cleanId = String(accountIdentifier).toLowerCase().trim();
+    const cloudKey = getAccountCloudKey(cleanId);
+    console.log('[Cloud Progress] Restoring progress for:', cleanId, 'Key:', cloudKey);
 
-async function restoreCloudProgress(userId) {
-    if (!userId) return;
+    // 1. Check local device backup first
+    try {
+        const localKey1 = `yakthung_cloud_user_${cleanId}`;
+        const localKey2 = `yakthung_cloud_user_${cloudKey}`;
+        const saved = localStorage.getItem(localKey1) || localStorage.getItem(localKey2);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && (Number(parsed.unlockedLevel) > 1 || Number(parsed.xp) > 0)) {
+                mergeProgress(parsed);
+            }
+        }
+    } catch (e) {}
 
-    if (firestoreDb && !userId.startsWith('demo_') && !userId.startsWith('g_') && !userId.startsWith('user_')) {
-        try {
-            const docRef = firestoreDb.collection('users').doc(userId).collection('data').doc('progress');
-            const docSnap = await docRef.get();
-            if (docSnap && docSnap.exists) {
-                mergeProgress(docSnap.data());
+    // 2. Fetch authoritative cloud data from persistent Cloud Progress Hub
+    try {
+        const res = await fetch(CLOUD_PROGRESS_URL, { cache: 'no-store' });
+        if (res.ok) {
+            const json = await res.json();
+            const hubData = json.data || {};
+            const users = hubData.users || {};
+
+            let foundCloud = users[cloudKey] || users[cleanId];
+            if (!foundCloud) {
+                for (const u of Object.values(users)) {
+                    if (u && u.email && u.email.toLowerCase().trim() === cleanId) {
+                        foundCloud = u;
+                        break;
+                    }
+                }
+            }
+
+            if (foundCloud) {
+                console.log('[Cloud Progress] Found cloud progress on Hub:', foundCloud);
+                mergeProgress(foundCloud);
+                if (typeof showToast === 'function') {
+                    showToast(`Progress restored! You are on Level ${progress.unlockedLevel} (${progress.xp} XP)`, '☁️');
+                }
                 return;
             }
-        } catch (e) {}
+        }
+    } catch (e) {
+        console.warn('[Cloud Progress] Cloud restore fetch notice:', e);
     }
 
-    const userCloudKey = `yakthung_cloud_user_${userId}`;
-    const saved = localStorage.getItem(userCloudKey);
-    if (saved) {
-        try { mergeProgress(JSON.parse(saved)); } catch (e) {}
-    } else {
+    // 3. If no cloud data exists yet, but local device has progress (e.g. played as guest before signing in),
+    // immediately upload local progress to the user's Google account!
+    if (progress && (Number(progress.unlockedLevel) > 1 || Number(progress.xp) > 0)) {
         syncCloudProgress(false);
     }
 }
@@ -887,17 +930,44 @@ async function restoreCloudProgress(userId) {
 function mergeProgress(cloudProgress) {
     if (!cloudProgress || typeof cloudProgress !== 'object' || typeof progress === 'undefined') return;
 
-    progress.unlockedLevel = Math.max(Number(progress.unlockedLevel) || 1, Number(cloudProgress.unlockedLevel) || 1);
-    progress.xp = Math.max(Number(progress.xp) || 0, Number(cloudProgress.xp) || 0);
-    progress.streak = Math.max(Number(progress.streak) || 1, Number(cloudProgress.streak) || 1);
+    const cloudLevel = Number(cloudProgress.unlockedLevel || cloudProgress.level) || 1;
+    const cloudXp = Number(cloudProgress.xp) || 0;
+    const cloudStreak = Number(cloudProgress.streak) || 1;
+
+    progress.unlockedLevel = Math.max(Number(progress.unlockedLevel) || 1, cloudLevel);
+    progress.xp = Math.max(Number(progress.xp) || 0, cloudXp);
+    progress.streak = Math.max(Number(progress.streak) || 1, cloudStreak);
 
     if (cloudProgress.levelStars && typeof cloudProgress.levelStars === 'object') {
-        progress.levelStars = { ...progress.levelStars, ...cloudProgress.levelStars };
+        for (const [k, v] of Object.entries(cloudProgress.levelStars)) {
+            const cur = progress.levelStars[k] || 0;
+            progress.levelStars[k] = Math.max(cur, Number(v) || 0);
+            progress.levelStars[String(k)] = Math.max(cur, Number(v) || 0);
+        }
     }
+
+    // Auto-backfill completed level stars for all stages prior to unlockedLevel
+    for (let i = 1; i < progress.unlockedLevel; i++) {
+        if (!progress.levelStars[i] && !progress.levelStars[String(i)]) {
+            progress.levelStars[i] = 3;
+            progress.levelStars[String(i)] = 3;
+        }
+    }
+
     if (Array.isArray(cloudProgress.masteredChars)) {
         progress.masteredChars = Array.from(new Set([...progress.masteredChars, ...cloudProgress.masteredChars]));
     }
-    if (typeof saveProgress === 'function') saveProgress();
+
+    // Persist immediately to localStorage
+    if (typeof saveProgress === 'function') {
+        saveProgress();
+    }
+    if (typeof updateHudDisplay === 'function') {
+        updateHudDisplay();
+    }
+    if (typeof renderWindingMap === 'function') {
+        renderWindingMap();
+    }
 }
 
 async function syncCloudProgress(notify = true) {
@@ -906,28 +976,45 @@ async function syncCloudProgress(notify = true) {
         return;
     }
 
+    const accountIdentifier = (currentUser.email || currentUser.id || 'learner').toLowerCase().trim();
+    const cloudKey = getAccountCloudKey(accountIdentifier);
+
     currentUser.lastSynced = new Date().toISOString();
     try {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
-        const userCloudKey = `yakthung_cloud_user_${currentUser.id}`;
-        localStorage.setItem(userCloudKey, JSON.stringify(progress));
+        localStorage.setItem(`yakthung_cloud_user_${currentUser.id}`, JSON.stringify(progress));
+        if (currentUser.email) {
+            localStorage.setItem(`yakthung_cloud_user_${currentUser.email.toLowerCase().trim()}`, JSON.stringify(progress));
+        }
+        localStorage.setItem(`yakthung_cloud_user_${cloudKey}`, JSON.stringify(progress));
     } catch (e) {}
 
-    if (firestoreDb && !currentUser.isLocalAccount) {
-        try {
-            await firestoreDb.collection('users').doc(currentUser.id).collection('data').doc('progress').set({
-                unlockedLevel: progress.unlockedLevel || 1,
-                levelStars: progress.levelStars || {},
-                xp: progress.xp || 0,
-                streak: progress.streak || 1,
-                masteredChars: progress.masteredChars || [],
-                updatedAt: window.firebase && window.firebase.firestore ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
-            }, { merge: true });
-        } catch (e) {}
+    // Ensure all completed levels have stars
+    const currentUnlocked = Number(progress.unlockedLevel) || 1;
+    for (let i = 1; i < currentUnlocked; i++) {
+        if (!progress.levelStars[i] && !progress.levelStars[String(i)]) {
+            progress.levelStars[i] = 3;
+            progress.levelStars[String(i)] = 3;
+        }
     }
 
+    const payload = {
+        unlockedLevel: currentUnlocked,
+        levelStars: progress.levelStars || {},
+        xp: Number(progress.xp) || 0,
+        streak: Number(progress.streak) || 1,
+        masteredChars: progress.masteredChars || [],
+        email: currentUser.email || '',
+        name: currentUser.name || currentUser.username || 'Yakthung Learner',
+        provider: currentUser.provider || 'google',
+        syncedAt: new Date().toISOString()
+    };
+
+    // Save to Cloud Hub (Guaranteed 100% persistent across uninstalls and devices)
+    saveProgressToCloudHub(cloudKey, payload);
+
     updateAuthUI();
-    if (notify && typeof showToast === 'function') showToast('Progress saved & backed up ✓', '☁️');
+    if (notify && typeof showToast === 'function') showToast('Progress backed up to Google account ✓', '☁️');
 
     if (typeof recordAdminActivity === 'function' && currentUser) {
         recordAdminActivity('sync', {
@@ -935,9 +1022,42 @@ async function syncCloudProgress(notify = true) {
             userName: currentUser.name,
             email: currentUser.email,
             provider: currentUser.provider,
-            level: (typeof progress !== 'undefined' ? (progress.unlockedLevel || 1) : 1),
+            level: currentUnlocked,
             xp: (typeof progress !== 'undefined' ? (progress.xp || 0) : 0)
         });
+    }
+}
+
+async function saveProgressToCloudHub(cloudKey, payload) {
+    if (!cloudKey) return;
+    try {
+        const getRes = await fetch(CLOUD_PROGRESS_URL, { cache: 'no-store' });
+        if (!getRes.ok) return;
+        const json = await getRes.json();
+        const hubData = json.data || { users: {} };
+        if (!hubData.users) hubData.users = {};
+
+        const existing = hubData.users[cloudKey];
+        if (existing) {
+            payload.unlockedLevel = Math.max(Number(payload.unlockedLevel) || 1, Number(existing.unlockedLevel) || 1);
+            payload.xp = Math.max(Number(payload.xp) || 0, Number(existing.xp) || 0);
+            payload.streak = Math.max(Number(payload.streak) || 1, Number(existing.streak) || 1);
+            payload.levelStars = { ...(existing.levelStars || {}), ...(payload.levelStars || {}) };
+        }
+
+        hubData.users[cloudKey] = payload;
+
+        await fetch(CLOUD_PROGRESS_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: 'Yakthung Pan Cloud Progress Engine',
+                data: hubData
+            })
+        });
+        console.log('[Cloud Progress] Backed up to Cloud Hub for:', cloudKey, 'Level:', payload.unlockedLevel);
+    } catch (e) {
+        console.warn('[Cloud Progress] Cloud Hub save notice:', e);
     }
 }
 

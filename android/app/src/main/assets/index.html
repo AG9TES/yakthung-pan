@@ -247,9 +247,10 @@
                 </button>
 
                 <!-- Profile / Login / Logout Button in Top Right -->
-                <button onclick="openAuthModal()" class="px-2.5 py-1 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/50 text-emerald-300 font-extrabold text-[10px] flex items-center gap-1.5 shadow-xs active:scale-95 transition" title="Profile / Login / Logout">
+                <button onclick="openAuthModal()" class="relative px-2.5 py-1 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/50 text-emerald-300 font-extrabold text-[10px] flex items-center gap-1.5 shadow-xs active:scale-95 transition" title="Profile / Login / Logout">
                     <span id="hudUserAvatar" class="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center text-[10px]">👤</span>
                     <span id="hudUserLoginBtnText" class="max-w-[55px] truncate">Sign In</span>
+                    <span id="hudUserStatusDot" class="w-2 h-2 rounded-full bg-slate-400 absolute -top-0.5 -right-0.5 ring-2 ring-slatebrand-900"></span>
                 </button>
             </div>
         </header>

@@ -5,11 +5,20 @@
 
 // Helper to evaluate locked state:
 // When devMode is true: ALL levels are open!
-// When devMode is false: Normal sequential progression (previous level must have stars).
+// When devMode is false: Normal sequential progression (previous level must have stars or level is <= unlocked level).
 function isLevelLocked(lvl) {
     if (devMode) return false;
     const num = Number(lvl.levelNum);
     if (num <= 1) return false;
+
+    // A level is unlocked if its number is within the player's unlocked level
+    const effective = (typeof getEffectiveUnlockedLevel === 'function') 
+        ? getEffectiveUnlockedLevel() 
+        : (Number(progress.unlockedLevel) || 1);
+
+    if (num <= effective) {
+        return false;
+    }
 
     // Check if previous level has stars
     const idx = ADVENTURE_LEVELS.findIndex(l => Number(l.levelNum) === num);
@@ -143,10 +152,11 @@ function renderWindingMap(targetLvlOverride) {
 
     coords.forEach(({ lvl, xPct, yPx }) => {
         const numKey = lvl.levelNum;
-        const isDone = Boolean(progress.levelStars[numKey] || progress.levelStars[String(numKey)]);
+        const isDone = (Number(numKey) < Number(effectiveUnlocked)) || Boolean(progress.levelStars[numKey] || progress.levelStars[String(numKey)]);
         const isCurrent = String(lvl.levelNum) === String(effectiveUnlocked);
         const isLocked = isLevelLocked(lvl);
-        const stars = progress.levelStars[numKey] || progress.levelStars[String(numKey)] || 0;
+        let stars = progress.levelStars[numKey] || progress.levelStars[String(numKey)] || 0;
+        if (isDone && stars === 0) stars = 3;
 
         const wrapper = document.createElement('div');
         wrapper.className = 'absolute z-20 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center';

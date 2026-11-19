@@ -22,17 +22,33 @@ let progress = {
     lastActiveDate: new Date().toDateString()
 };
 
-// Computes the actual unlocked level based on sequential stars
+// Computes the actual unlocked level based on progress and stars (never downscales player progress)
 function getEffectiveUnlockedLevel() {
-    if (typeof ADVENTURE_LEVELS === 'undefined' || !ADVENTURE_LEVELS.length) return 1;
+    if (typeof ADVENTURE_LEVELS === 'undefined' || !ADVENTURE_LEVELS.length) {
+        return Number(progress.unlockedLevel) || 1;
+    }
+
+    let maxUnlocked = Number(progress.unlockedLevel) || 1;
+
+    // Check all levels for earned stars: if a level has stars, the next level is unlocked
     for (let i = 0; i < ADVENTURE_LEVELS.length; i++) {
         const lvl = ADVENTURE_LEVELS[i];
         const stars = progress.levelStars[lvl.levelNum] || progress.levelStars[String(lvl.levelNum)] || 0;
-        if (stars === 0) {
-            return lvl.levelNum; // Next level player needs to conquer
+        if (stars > 0) {
+            maxUnlocked = Math.max(maxUnlocked, lvl.levelNum + 1);
         }
     }
-    return ADVENTURE_LEVELS[ADVENTURE_LEVELS.length - 1].levelNum;
+
+    // Auto-backfill completed stars for all stages prior to maxUnlocked
+    // Ensures previously beaten stages show complete on map and never cause accidental relapse to Level 1
+    for (let i = 1; i < maxUnlocked; i++) {
+        if (!progress.levelStars[i] && !progress.levelStars[String(i)]) {
+            progress.levelStars[i] = 3;
+            progress.levelStars[String(i)] = 3;
+        }
+    }
+
+    return Math.min(maxUnlocked, ADVENTURE_LEVELS[ADVENTURE_LEVELS.length - 1].levelNum);
 }
 
 function loadProgress() {
@@ -53,12 +69,11 @@ function loadProgress() {
             saveProgress();
         }
 
-        // Self-heal: ensure unlockedLevel matches actual stars so map never opens in the middle
+        // Self-heal: ensure unlockedLevel is at least getEffectiveUnlockedLevel() without downgrading
         const effective = getEffectiveUnlockedLevel();
-        if (!devMode && Number(progress.unlockedLevel) > Number(effective)) {
-            progress.unlockedLevel = effective;
-            saveProgress();
-        }
+        progress.unlockedLevel = Math.max(Number(progress.unlockedLevel) || 1, effective);
+        progress.lastActiveDate = new Date().toDateString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
     } catch (e) {
         console.warn('Could not read localStorage:', e);
     }
