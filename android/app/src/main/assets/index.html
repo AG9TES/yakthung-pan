@@ -1100,23 +1100,11 @@
                                 </button>
                                 <p class="text-[11px] text-slate-400 text-center">Fast, official sign-in with your Google account</p>
 
-                                <!-- Error / Origin Mismatch Diagnostic Helper Banner -->
-                                <div id="googleAuthDiagnosticBanner" class="hidden p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-left text-xs space-y-2">
-                                    <div class="font-extrabold text-amber-300 flex items-center justify-between">
-                                        <div class="flex items-center gap-1.5">
-                                            <span>🔑</span> <span id="googleDiagTitle">Google OAuth Notice</span>
-                                        </div>
-                                        <button onclick="copyCurrentOrigin()" type="button" class="px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 rounded-lg cursor-pointer transition">
-                                            📋 Copy Origin
-                                        </button>
-                                    </div>
-                                    <p id="googleDiagMessage" class="text-[11px] text-amber-200/90 leading-relaxed">
-                                        Google blocks popups on unregistered web origins. Connect via 1-Tap Instant Connect below or add this origin to Google Cloud Console.
-                                    </p>
-                                    <div class="flex items-center gap-2 pt-0.5">
-                                        <span class="text-[10px] text-amber-300 font-bold">Origin:</span>
-                                        <code id="googleCurrentOriginLabel" class="text-[10px] bg-slate-950/80 px-2 py-0.5 rounded border border-amber-500/30 font-mono text-amber-100 select-all">http://localhost:8080</code>
-                                    </div>
+                                <!-- Hidden Diagnostics Container (Retains element IDs for JS parity without showing in UI) -->
+                                <div id="googleAuthDiagnosticBanner" class="hidden" style="display:none !important;">
+                                    <div><span id="googleDiagTitle"></span></div>
+                                    <div><span id="googleDiagMessage"></span></div>
+                                    <div><span id="googleCurrentOriginLabel"></span></div>
                                 </div>
 
                                 <!-- Divider -->

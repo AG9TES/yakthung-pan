@@ -305,7 +305,7 @@ if (typeof window !== 'undefined') {
 
 // 1. Unified Google Authentication Handler (Native SDK on Android, Web GIS/OAuth on Web)
 async function handleGoogleSignInBtnClick() {
-    // A. Native Google Sign-In SDK for Android (Native Google Play Services Account Picker)
+    // A. Native Android Google Account Picker (Native OS System Bottom Sheet)
     if (typeof window !== 'undefined' && window.AndroidNativeGoogleAuth && typeof window.AndroidNativeGoogleAuth.promptNativeGoogleSignIn === 'function') {
         if (typeof showToast === 'function') {
             showToast('Opening Google Account Picker...', '⏳');
@@ -318,17 +318,7 @@ async function handleGoogleSignInBtnClick() {
         }
     }
 
-    // B. Check if running on local file:// protocol
-    if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
-        if (typeof showToast === 'function') {
-            showToast('Google OAuth does not support file://. Use Instant Connect below!', '⚠️');
-        }
-        openAuthModalWithTab('google');
-        handleGoogleAuthError({ code: 'file-protocol', message: 'Google OAuth cannot run from file:// URLs. Use 1-Tap Instant Connect below to start!' });
-        return;
-    }
-
-    // C. Web-Based Firebase Google OAuth (Popup Flow)
+    // B. Web-Based Firebase Google OAuth (Popup Flow)
     await signInWithGoogleFirebase();
 }
 
@@ -511,59 +501,17 @@ async function signInWithGoogleFirebase() {
 }
 
 function handleGoogleAuthError(error) {
-    const diagBanner = document.getElementById('googleAuthDiagnosticBanner');
-    const diagTitle = document.getElementById('googleDiagTitle');
-    const diagMsg = document.getElementById('googleDiagMessage');
-    const originLabel = document.getElementById('googleCurrentOriginLabel');
-
     const errCode = error ? (error.code || '') : '';
-    const errMsg = error ? (error.message || '') : '';
-    console.error('[Google Auth Error]:', errCode, errMsg, error);
-
-    const currentOrigin = (typeof window !== 'undefined' && window.location) 
-        ? (window.location.origin || (window.location.protocol + '//' + window.location.host)) 
-        : 'http://localhost:8080';
-
-    if (originLabel) {
-        originLabel.textContent = currentOrigin;
-    }
+    console.warn('[Google Auth]:', errCode, error);
 
     openAuthModalWithTab('google');
 
-    let title = 'Google OAuth Notice';
-    let message = '';
-
-    const isLocalhost = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1') || currentOrigin.startsWith('file:');
-
-    if (errCode === 'auth/popup-closed-by-user') {
-        title = 'Google Popup Notice';
-        message = isLocalhost
-            ? `Google popup closed. If you saw "Error 400: origin_mismatch", origin "${currentOrigin}" must be added under Authorised JavaScript origins in Google Cloud Console. Click Instant Connect below to sign in right now!`
-            : 'Google sign-in popup was closed. You can retry or use 1-Tap Instant Connect below.';
-    } else if (errCode === 'auth/unauthorized-domain' || errMsg.includes('origin_mismatch') || errMsg.includes('unauthorized-domain')) {
-        title = 'Origin Not Registered in Google Cloud';
-        message = `Google blocked sign-in because origin "${currentOrigin}" is not listed under Authorised JavaScript origins in Google Cloud Console. Connect instantly below without restrictions!`;
-    } else if (errCode === 'auth/popup-blocked') {
-        title = 'Browser Blocked Popup';
-        message = 'Your browser blocked the Google popup window. Please allow popups for this site, or use 1-Tap Instant Connect below.';
-    } else if (errCode === 'auth/operation-not-allowed') {
-        title = 'Google Provider Disabled';
-        message = 'Google Sign-In is not enabled yet in your Firebase Console. Go to Authentication → Sign-in method → Enable Google, or connect instantly below.';
-    } else {
-        title = 'Google Web Sign-In Helper';
-        message = isLocalhost 
-            ? `Origin "${currentOrigin}" needs to be added in Google Cloud Console Credentials. Use 1-Tap Instant Connect below to bypass this and start immediately!`
-            : (errMsg || 'Google authentication was not completed. You can connect instantly below.');
-    }
-
-    if (diagBanner && diagTitle && diagMsg) {
-        diagTitle.textContent = title;
-        diagMsg.textContent = message;
-        diagBanner.classList.remove('hidden');
-    }
-
     if (typeof showToast === 'function') {
-        showToast(title, '⚠️');
+        if (errCode === 'auth/popup-closed-by-user') {
+            showToast('Sign-in cancelled. You can also connect instantly below!', 'ℹ️');
+        } else {
+            showToast('Connect with Google below to sync your progress!', '✨');
+        }
     }
 
     const input = document.getElementById('googleNameOrEmailInput');
