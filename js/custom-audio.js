@@ -641,10 +641,11 @@ function openVoiceStudio(targetId = null) {
     CustomAudioStore.updateBadges();
 }
 
-function closeVoiceStudio() {
+function closeVoiceStudio(silent = false) {
     HardwareRecorder.stop();
     const modal = document.getElementById('voiceStudioModal');
     if (modal) modal.classList.add('hidden');
+    if (!silent && typeof setNavTabActive === 'function') setNavTabActive('trail');
 }
 
 function setVoiceStudioFilter(filter) {

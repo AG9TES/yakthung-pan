@@ -11,8 +11,10 @@
             switchChartTab(session.activeChartTab || 'consonants');
         }
 
-        function closeChartModal() {
-            document.getElementById('chartModal').classList.add('hidden');
+        function closeChartModal(silent = false) {
+            const modal = document.getElementById('chartModal');
+            if (modal) modal.classList.add('hidden');
+            if (!silent && typeof setNavTabActive === 'function') setNavTabActive('trail');
         }
 
         function switchChartTab(tabName) {

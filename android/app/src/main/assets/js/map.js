@@ -36,11 +36,11 @@ function renderWindingMap(targetLvlOverride) {
     const reversedLevels = [...ADVENTURE_LEVELS].reverse();
     const stepHeight = 126;
     const topPad = 120;
-    const bottomPad = 100;
+    const bottomPad = 140;
     const totalHeight = topPad + (reversedLevels.length - 1) * stepHeight + bottomPad;
 
     container.style.height = `${totalHeight}px`;
-    container.className = 'relative w-full bg-gradient-to-b from-indigo-100/75 via-parchment-50 to-emerald-100/80';
+    container.className = 'relative w-full bg-gradient-to-b from-[#e0f2fe] via-[#f1f5f9] to-[#ecfdf5] overflow-hidden';
 
     // Explicit X-coordinates for serpentine mountain trail (Levels 1-21)
     const levelXMap = {
@@ -94,24 +94,65 @@ function renderWindingMap(targetLvlOverride) {
         }
     });
 
-    const trailOuter = document.createElementNS(svgNS, 'path');
-    trailOuter.setAttribute('d', d);
-    trailOuter.setAttribute('fill', 'none');
-    trailOuter.setAttribute('stroke', 'rgba(5, 150, 105, 0.24)');
-    trailOuter.setAttribute('stroke-width', '4.4');
-    trailOuter.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(trailOuter);
+    // 1. Lush emerald outer grassy border
+    const trailBorder = document.createElementNS(svgNS, 'path');
+    trailBorder.setAttribute('d', d);
+    trailBorder.setAttribute('fill', 'none');
+    trailBorder.setAttribute('stroke', '#059669');
+    trailBorder.setAttribute('stroke-width', '22');
+    trailBorder.setAttribute('stroke-linecap', 'round');
+    trailBorder.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(trailBorder);
 
+    // 2. Warm cream mountain path surface
+    const trailBody = document.createElementNS(svgNS, 'path');
+    trailBody.setAttribute('d', d);
+    trailBody.setAttribute('fill', 'none');
+    trailBody.setAttribute('stroke', '#fef3c7');
+    trailBody.setAttribute('stroke-width', '16');
+    trailBody.setAttribute('stroke-linecap', 'round');
+    trailBody.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(trailBody);
+
+    // 3. Delicate emerald dashed guideline
     const trailDash = document.createElementNS(svgNS, 'path');
     trailDash.setAttribute('d', d);
     trailDash.setAttribute('fill', 'none');
-    trailDash.setAttribute('stroke', '#ffffff');
-    trailDash.setAttribute('stroke-width', '1.8');
-    trailDash.setAttribute('stroke-dasharray', '3 3');
+    trailDash.setAttribute('stroke', '#10b981');
+    trailDash.setAttribute('stroke-opacity', '0.45');
+    trailDash.setAttribute('stroke-width', '1.6');
+    trailDash.setAttribute('stroke-dasharray', '3 4');
     trailDash.setAttribute('stroke-linecap', 'round');
     svg.appendChild(trailDash);
 
     container.appendChild(svg);
+
+    // Decorative Himalayan pine tree accents on mountain slopes
+    const treeCoords = [
+        { x: 10, y: 160, s: '🌲' },
+        { x: 88, y: 260, s: '🌲' },
+        { x: 12, y: 420, s: '🌲' },
+        { x: 86, y: 540, s: '🌲' },
+        { x: 14, y: 700, s: '🌲' },
+        { x: 85, y: 860, s: '🌲' },
+        { x: 10, y: 1020, s: '🌲' },
+        { x: 88, y: 1180, s: '🌲' },
+        { x: 12, y: 1360, s: '🌲' },
+        { x: 85, y: 1520, s: '🌲' },
+        { x: 10, y: 1700, s: '🌲' },
+        { x: 88, y: 1880, s: '🌲' },
+        { x: 14, y: 2040, s: '🌲' },
+        { x: 85, y: 2220, s: '🌲' },
+        { x: 10, y: 2400, s: '🌲' }
+    ];
+    treeCoords.forEach(t => {
+        const tree = document.createElement('div');
+        tree.className = 'absolute text-xl sm:text-2xl opacity-40 select-none pointer-events-none z-10';
+        tree.style.left = `${t.x}%`;
+        tree.style.top = `${t.y}px`;
+        tree.textContent = t.s;
+        container.appendChild(tree);
+    });
 
     // Dynamically Render Chapter Banner Headers above each chapter's top-most node
     const chapterTopNodes = {};
@@ -163,41 +204,41 @@ function renderWindingMap(targetLvlOverride) {
         wrapper.style.left = `${xPct}%`;
         wrapper.style.top = `${yPx}px`;
 
-        // Floating PLAY callout on current unlocked node
+        // Floating PLAY callout on current active unlocked node (glowing gold with cheerful PLAY pill)
         if (isCurrent && !devMode && !isLocked) {
             const badge = document.createElement('div');
-            badge.className = 'float-play-badge absolute -top-9 left-1/2 bg-slatebrand-900 text-goldaccent-400 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-lg border border-goldaccent-400/60 whitespace-nowrap';
-            badge.textContent = '▶ PLAY';
+            badge.className = 'float-play-badge absolute -top-8 left-1/2 bg-amber-400 text-slate-900 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full shadow-lg border-2 border-white whitespace-nowrap z-30 select-none';
+            badge.textContent = 'PLAY';
             wrapper.appendChild(badge);
 
             const pulse = document.createElement('div');
-            pulse.className = 'active-node-ring absolute top-0 w-16 h-16 rounded-full bg-emerald-500/40 pointer-events-none';
+            pulse.className = 'active-node-ring absolute top-0 w-20 h-20 rounded-full bg-amber-400/35 pointer-events-none';
             wrapper.appendChild(pulse);
         }
 
         const btn = document.createElement('button');
         let btnColors = '';
         if (isLocked) {
-            btnColors = 'bg-gradient-to-b from-slate-200 to-slate-300 border-4 border-slate-100 text-slate-500 shadow-[0_5px_0_#94a3b8]';
+            btnColors = 'bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 border-[3.5px] border-slate-100 text-slate-500 shadow-[0_6px_0_#94a3b8]';
         } else if (lvl.isBoss) {
             // Boss levels ALWAYS retain their majestic purple / indigo Boss styling!
-            btnColors = 'bg-gradient-to-b from-purple-600 via-indigo-700 to-indigo-900 border-4 border-amber-300 text-white shadow-[0_6px_0_#312e81] hover:brightness-110';
+            btnColors = 'bg-gradient-to-b from-purple-500 via-indigo-600 to-purple-800 border-[3.5px] border-amber-300 text-white shadow-[0_6px_0_#312e81] hover:brightness-105';
         } else if (isDone) {
-            btnColors = 'bg-gradient-to-b from-emerald-400 to-emerald-600 border-4 border-white text-white shadow-[0_6px_0_#065f46]';
+            btnColors = 'bg-gradient-to-b from-emerald-400 via-emerald-500 to-emerald-600 border-[3.5px] border-white text-white shadow-[0_6px_0_#065f46] hover:brightness-105';
         } else if (isCurrent) {
-            btnColors = 'bg-gradient-to-b from-goldaccent-400 to-amber-600 border-4 border-white text-slatebrand-900 shadow-[0_6px_0_#92400e]';
+            btnColors = 'bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 border-[3.5px] border-white text-slatebrand-900 shadow-[0_6px_0_#b45309] hover:brightness-105';
         } else if (devMode) {
-            btnColors = 'bg-gradient-to-b from-emerald-500 to-teal-700 border-4 border-white text-white shadow-[0_6px_0_#064e3b] hover:brightness-110';
+            btnColors = 'bg-gradient-to-b from-emerald-500 to-teal-700 border-[3.5px] border-white text-white shadow-[0_6px_0_#064e3b] hover:brightness-105';
         } else {
-            btnColors = 'bg-gradient-to-b from-slate-200 to-slate-300 border-4 border-slate-100 text-slate-500 shadow-[0_5px_0_#94a3b8]';
+            btnColors = 'bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 border-[3.5px] border-slate-100 text-slate-500 shadow-[0_6px_0_#94a3b8]';
         }
 
-        const sizeClass = lvl.isBoss ? 'w-[74px] h-[74px]' : 'w-[66px] h-[66px]';
-        btn.className = `node-3d relative ${sizeClass} rounded-full flex flex-col items-center justify-center ${btnColors} transition transform active:scale-95 cursor-pointer`;
+        const sizeClass = lvl.isBoss ? 'w-[74px] h-[74px]' : 'w-[68px] h-[68px]';
+        btn.className = `node-3d relative ${sizeClass} rounded-full flex flex-col items-center justify-center ${btnColors} transition transform active:scale-95 cursor-pointer select-none`;
 
         if (isLocked) {
             btn.innerHTML = `
-                <span class="text-base">🔒</span>
+                <span class="text-lg">🔒</span>
                 <span class="text-[9px] font-extrabold leading-none mt-0.5">Lvl ${lvl.levelNum}</span>
             `;
             btn.onclick = () => {
@@ -211,9 +252,9 @@ function renderWindingMap(targetLvlOverride) {
             // Open Level: Display character glyph
             const iconStyle = (lvl.type === 'trace' || lvl.type === 'saknam') ? 'font-limbu text-2xl' : 'text-2xl';
             btn.innerHTML = `
-                ${isDone ? '<span class="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-goldaccent-400 text-slatebrand-900 border-2 border-white text-xs font-extrabold flex items-center justify-center shadow">✓</span>' : ''}
-                <span class="${iconStyle} leading-none font-bold">${lvl.icon}</span>
-                <span class="text-[9px] font-extrabold uppercase mt-0.5">Lvl ${lvl.levelNum}</span>
+                ${isDone ? '<span class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-400 text-slate-900 border-2 border-white text-[10px] font-black flex items-center justify-center shadow">✓</span>' : ''}
+                <span class="${iconStyle} leading-none font-bold drop-shadow-xs">${lvl.icon}</span>
+                <span class="text-[9px] font-black uppercase mt-0.5 tracking-tight">Lvl ${lvl.levelNum}</span>
             `;
             btn.onclick = () => {
                 playTone(440, 'note');
@@ -225,19 +266,19 @@ function renderWindingMap(targetLvlOverride) {
 
         // 3-Star Pill underneath node
         const starRow = document.createElement('div');
-        starRow.className = 'mt-1.5 px-2 py-0.5 rounded-full bg-white/95 border border-black/5 shadow-xs flex items-center gap-0.5 text-[11px]';
+        starRow.className = 'mt-2 px-2.5 py-0.5 rounded-full bg-white/95 border border-slate-200/80 shadow-xs flex items-center gap-0.5 text-xs select-none';
         for (let s = 1; s <= 3; s++) {
             const st = document.createElement('span');
             st.textContent = '★';
-            st.className = s <= stars ? 'text-goldaccent-400' : 'text-slate-300';
+            st.className = s <= stars ? 'text-amber-400 drop-shadow-2xs' : 'text-slate-300';
             starRow.appendChild(st);
         }
         wrapper.appendChild(starRow);
 
         // Level Title Tag
         const lbl = document.createElement('span');
-        lbl.className = `mt-1 text-[10px] font-extrabold px-2 py-0.5 rounded-md whitespace-nowrap shadow-xs ${
-            isLocked ? 'text-slate-500 bg-white/60' : 'text-slatebrand-900 bg-white/95'
+        lbl.className = `mt-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md whitespace-nowrap shadow-xs select-none ${
+            isLocked ? 'text-slate-400 bg-white/70' : 'text-slate-800 bg-white/95 border border-slate-100'
         }`;
         lbl.textContent = lvl.title;
         wrapper.appendChild(lbl);

@@ -72,12 +72,61 @@ function hideAllLessonWorkspaces() {
 }
 window.hideAllLessonWorkspaces = hideAllLessonWorkspaces;
 
+// Bottom Navigation Dock Controller
+function setNavTabActive(tabName) {
+    const tabs = ['trail', 'letters', 'studio', 'profile'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`navTab_${t}`);
+        if (!btn) return;
+        if (t === tabName) {
+            btn.className = 'flex flex-col items-center gap-0.5 text-emerald-600 font-black transition active:scale-95 cursor-pointer select-none';
+        } else {
+            btn.className = 'flex flex-col items-center gap-0.5 text-slate-400 font-semibold hover:text-slate-700 transition active:scale-95 cursor-pointer select-none';
+        }
+    });
+}
+window.setNavTabActive = setNavTabActive;
+
+function switchNavTab(tabName) {
+    setNavTabActive(tabName);
+    if (tabName === 'trail') {
+        if (typeof closeChartModal === 'function') closeChartModal(true);
+        if (typeof closeVoiceStudio === 'function') closeVoiceStudio(true);
+        if (typeof closeAuthModal === 'function') closeAuthModal(true);
+        if (typeof closeCreditsModal === 'function') closeCreditsModal();
+        if (typeof closeSupporterModal === 'function') closeSupporterModal();
+        if (typeof renderWindingMap === 'function') renderWindingMap();
+    } else if (tabName === 'letters') {
+        if (typeof closeVoiceStudio === 'function') closeVoiceStudio(true);
+        if (typeof closeAuthModal === 'function') closeAuthModal(true);
+        if (typeof closeCreditsModal === 'function') closeCreditsModal();
+        if (typeof closeSupporterModal === 'function') closeSupporterModal();
+        if (typeof openChartModal === 'function') openChartModal();
+    } else if (tabName === 'studio') {
+        if (typeof closeChartModal === 'function') closeChartModal(true);
+        if (typeof closeAuthModal === 'function') closeAuthModal(true);
+        if (typeof closeCreditsModal === 'function') closeCreditsModal();
+        if (typeof closeSupporterModal === 'function') closeSupporterModal();
+        if (typeof openVoiceStudio === 'function') openVoiceStudio();
+    } else if (tabName === 'profile') {
+        if (typeof closeChartModal === 'function') closeChartModal(true);
+        if (typeof closeVoiceStudio === 'function') closeVoiceStudio(true);
+        if (typeof closeCreditsModal === 'function') closeCreditsModal();
+        if (typeof closeSupporterModal === 'function') closeSupporterModal();
+        if (typeof openAuthModal === 'function') openAuthModal();
+    }
+}
+window.switchNavTab = switchNavTab;
+
 function closeLessonModal() {
     const modal = document.getElementById('lessonModal');
     if (modal) {
         modal.classList.add('hidden');
         modal.style.setProperty('display', 'none', 'important');
     }
+    const navDock = document.getElementById('bottomNavDock');
+    if (navDock) navDock.classList.remove('hidden');
+    if (typeof setNavTabActive === 'function') setNavTabActive('trail');
     hideAllLessonWorkspaces();
     renderWindingMap();
 }
@@ -87,6 +136,9 @@ function startAdventureLevel(lvl) {
     session.isSinglePractice = false;
     session.stepIdx = 0;
     session.stepAccuracies = [];
+
+    const navDock = document.getElementById('bottomNavDock');
+    if (navDock) navDock.classList.add('hidden');
 
     const modal = document.getElementById('lessonModal');
     if (modal) {

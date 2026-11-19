@@ -1208,9 +1208,10 @@ function openAuthModal(isMandatory = false) {
     updateAuthUI();
 }
 
-function closeAuthModal() {
+function closeAuthModal(silent = false) {
     const modal = document.getElementById('authModal');
     if (modal) modal.classList.add('hidden');
+    if (!silent && typeof setNavTabActive === 'function') setNavTabActive('trail');
 }
 
 function updateAuthUI() {
