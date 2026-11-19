@@ -200,7 +200,7 @@ async function handleFirebaseAuthStateChanged(user) {
     }
 }
 
-var GOOGLE_WEB_CLIENT_ID = "923150025349-92q8j8447cedud48e68pp2ungs0b82b9.apps.googleusercontent.com";
+var GOOGLE_WEB_CLIENT_ID = "847227028746-jesk67phleei8vgdaveiekluddu66al2.apps.googleusercontent.com";
 
 // ---------------------------------------------------------------------
 // Sign-In & Registration Handlers (Web-Based Authentication Flow)

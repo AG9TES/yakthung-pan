@@ -36,7 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int RC_GOOGLE_SIGN_IN = 9001;
     private GoogleSignInClient mGoogleSignInClient;
 
-    private static final String WEB_CLIENT_ID = "923150025349-92q8j8447cedud48e68pp2ungs0b82b9.apps.googleusercontent.com";
+    private static final String WEB_CLIENT_ID = "847227028746-jesk67phleei8vgdaveiekluddu66al2.apps.googleusercontent.com";
 
     public class WebAppInterface {
         @JavascriptInterface
