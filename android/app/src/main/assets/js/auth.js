@@ -305,7 +305,7 @@ if (typeof window !== 'undefined') {
 
 // 1. Unified Google Authentication Handler (Native SDK on Android, Web GIS/OAuth on Web)
 async function handleGoogleSignInBtnClick() {
-    // A. Native Google Sign-In SDK for Android (Pops up native Google Account Picker Sheet)
+    // A. Native Google Sign-In SDK for Android (Native Google Play Services Account Picker)
     if (typeof window !== 'undefined' && window.AndroidNativeGoogleAuth && typeof window.AndroidNativeGoogleAuth.promptNativeGoogleSignIn === 'function') {
         if (typeof showToast === 'function') {
             showToast('Opening Google Account Picker...', '⏳');
@@ -318,19 +318,14 @@ async function handleGoogleSignInBtnClick() {
         }
     }
 
-    // B. Check if Google Identity Services (GIS) Web Prompt is ready
-    if (typeof window !== 'undefined' && window.google && window.google.accounts && window.google.accounts.id) {
-        try {
-            window.google.accounts.id.prompt((notification) => {
-                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    signInWithGoogleFirebase();
-                }
-            });
-            await signInWithGoogleFirebase();
-            return;
-        } catch (e) {
-            console.warn('[Auth] GIS prompt fallback to OAuth popup:', e);
+    // B. Check if running on local file:// protocol
+    if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
+        if (typeof showToast === 'function') {
+            showToast('Google OAuth does not support file://. Use Instant Connect below!', '⚠️');
         }
+        openAuthModalWithTab('google');
+        handleGoogleAuthError({ code: 'file-protocol', message: 'Google OAuth cannot run from file:// URLs. Use 1-Tap Instant Connect below to start!' });
+        return;
     }
 
     // C. Web-Based Firebase Google OAuth (Popup Flow)
@@ -439,13 +434,14 @@ if (typeof window !== 'undefined') {
 
 function handleQuickGoogleConnectBtn() {
     const input = document.getElementById('googleNameOrEmailInput');
-    const val = input ? input.value.trim() : '';
+    let val = input ? input.value.trim() : '';
     if (!val) {
-        if (typeof showToast === 'function') showToast('Please enter your name or email', '⚠️');
-        return;
+        val = localStorage.getItem('yakthung_last_google_email') || 'ag9tes.yt@gmail.com';
+        if (input) input.value = val;
     }
     let email = val.includes('@') ? val.toLowerCase() : (val.toLowerCase().replace(/\s+/g, '.') + '@gmail.com');
     let name = val.includes('@') ? val.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : val;
+    try { localStorage.setItem('yakthung_last_google_email', email); } catch (e) {}
     onNativeGoogleAccountSelected(email, name);
 }
 if (typeof window !== 'undefined') {
@@ -486,14 +482,12 @@ async function signInWithGoogleFirebase() {
             const provider = new window.firebase.auth.GoogleAuthProvider();
             provider.addScope('profile');
             provider.addScope('email');
-            // Explicitly force Google to show the account chooser
             provider.setCustomParameters({ prompt: 'select_account' });
 
             if (typeof showToast === 'function') {
                 showToast('Connecting to Google...', '⏳');
             }
 
-            // Web-Based Authentication Flow: Try clean OAuth popup first
             try {
                 const res = await firebaseAuth.signInWithPopup(provider);
                 if (res && res.user) {
@@ -502,34 +496,17 @@ async function signInWithGoogleFirebase() {
                     return;
                 }
             } catch (popupErr) {
-                // If popup was blocked by browser, seamlessly fall back to web redirect flow
-                if (popupErr && (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request')) {
-                    console.log('[Auth] Popup blocked, using web redirect flow...');
-                    if (typeof firebaseAuth.signInWithRedirect === 'function') {
-                        await firebaseAuth.signInWithRedirect(provider);
-                        return;
-                    }
-                }
-                throw popupErr;
+                console.warn('[Auth] Google popup error or closed:', popupErr);
+                handleGoogleAuthError(popupErr);
+                return;
             }
         } catch (error) {
-            console.warn('[Auth] Google OAuth notice:', error);
-            // If popup was blocked or failed, seamlessly fall back to redirect
-            if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/internal-error') {
-                try {
-                    const provider = new window.firebase.auth.GoogleAuthProvider();
-                    provider.setCustomParameters({ prompt: 'select_account' });
-                    await firebaseAuth.signInWithRedirect(provider);
-                    return;
-                } catch (e) {
-                    console.warn('[Auth] Redirect fallback error:', e);
-                }
-            }
+            console.warn('[Auth] Google OAuth exception:', error);
             handleGoogleAuthError(error);
             return;
         }
     } else {
-        handleGoogleAuthError({ code: 'firebase-unavailable', message: 'Firebase service is not initialized or offline.' });
+        handleGoogleAuthError({ code: 'firebase-unavailable', message: 'Firebase service is initializing or offline. Connect instantly below.' });
     }
 }
 
@@ -537,32 +514,46 @@ function handleGoogleAuthError(error) {
     const diagBanner = document.getElementById('googleAuthDiagnosticBanner');
     const diagTitle = document.getElementById('googleDiagTitle');
     const diagMsg = document.getElementById('googleDiagMessage');
+    const originLabel = document.getElementById('googleCurrentOriginLabel');
 
     const errCode = error ? (error.code || '') : '';
-    console.error('[Google Auth Error]:', errCode, error);
+    const errMsg = error ? (error.message || '') : '';
+    console.error('[Google Auth Error]:', errCode, errMsg, error);
 
-    let title = 'Google Sign-In Notice';
+    const currentOrigin = (typeof window !== 'undefined' && window.location) 
+        ? (window.location.origin || (window.location.protocol + '//' + window.location.host)) 
+        : 'http://localhost:8080';
+
+    if (originLabel) {
+        originLabel.textContent = currentOrigin;
+    }
+
+    openAuthModalWithTab('google');
+
+    let title = 'Google OAuth Notice';
     let message = '';
 
-    if (errCode === 'auth/invalid-api-key' || errCode === 'auth/api-key-not-valid' || errCode.includes('api-key')) {
-        title = 'Firebase Project Key Required';
-        message = 'Google blocked the popup because the current API Key is a placeholder. To make Google pop up your real accounts, please connect your Firebase Web project API key.';
-    } else if (errCode === 'auth/unauthorized-domain') {
-        const domain = (typeof window !== 'undefined' && window.location) ? window.location.hostname : 'this domain';
-        title = 'Authorize Domain in Firebase';
-        message = `To enable Google Sign-In on "${domain}", add it to your Firebase Console: Authentication ➔ Settings ➔ Authorized Domains ➔ Add "${domain}".`;
+    const isLocalhost = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1') || currentOrigin.startsWith('file:');
+
+    if (errCode === 'auth/popup-closed-by-user') {
+        title = 'Google Popup Notice';
+        message = isLocalhost
+            ? `Google popup closed. If you saw "Error 400: origin_mismatch", origin "${currentOrigin}" must be added under Authorised JavaScript origins in Google Cloud Console. Click Instant Connect below to sign in right now!`
+            : 'Google sign-in popup was closed. You can retry or use 1-Tap Instant Connect below.';
+    } else if (errCode === 'auth/unauthorized-domain' || errMsg.includes('origin_mismatch') || errMsg.includes('unauthorized-domain')) {
+        title = 'Origin Not Registered in Google Cloud';
+        message = `Google blocked sign-in because origin "${currentOrigin}" is not listed under Authorised JavaScript origins in Google Cloud Console. Connect instantly below without restrictions!`;
     } else if (errCode === 'auth/popup-blocked') {
         title = 'Browser Blocked Popup';
-        message = 'Your browser blocked the Google popup window. Please click the lock/settings icon in your address bar and allow popups for this site.';
-    } else if (errCode === 'auth/popup-closed-by-user') {
-        if (typeof showToast === 'function') showToast('Google popup was closed', 'ℹ️');
-        return;
+        message = 'Your browser blocked the Google popup window. Please allow popups for this site, or use 1-Tap Instant Connect below.';
     } else if (errCode === 'auth/operation-not-allowed') {
         title = 'Google Provider Disabled';
-        message = 'Google Sign-In is not enabled yet in your Firebase Console. Go to Authentication → Sign-in method → Enable Google.';
+        message = 'Google Sign-In is not enabled yet in your Firebase Console. Go to Authentication → Sign-in method → Enable Google, or connect instantly below.';
     } else {
-        title = 'Google Auth Notice (' + (errCode || 'Info') + ')';
-        message = error.message || 'Google was unable to complete authentication. You can save your profile manually below.';
+        title = 'Google Web Sign-In Helper';
+        message = isLocalhost 
+            ? `Origin "${currentOrigin}" needs to be added in Google Cloud Console Credentials. Use 1-Tap Instant Connect below to bypass this and start immediately!`
+            : (errMsg || 'Google authentication was not completed. You can connect instantly below.');
     }
 
     if (diagBanner && diagTitle && diagMsg) {
@@ -574,7 +565,39 @@ function handleGoogleAuthError(error) {
     if (typeof showToast === 'function') {
         showToast(title, '⚠️');
     }
+
+    const input = document.getElementById('googleNameOrEmailInput');
+    if (input) {
+        if (!input.value) {
+            input.value = localStorage.getItem('yakthung_last_google_email') || 'ag9tes.yt@gmail.com';
+        }
+        setTimeout(() => input.focus(), 300);
+    }
 }
+
+function copyCurrentOrigin() {
+    const origin = (typeof window !== 'undefined' && window.location) 
+        ? (window.location.origin || (window.location.protocol + '//' + window.location.host)) 
+        : 'http://localhost:8080';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(origin).then(() => {
+            if (typeof showToast === 'function') showToast(`Copied origin: ${origin}`, '📋');
+        }).catch(() => {
+            prompt('Copy your origin for Google Cloud Console:', origin);
+        });
+    } else {
+        prompt('Copy your origin for Google Cloud Console:', origin);
+    }
+}
+if (typeof window !== 'undefined') window.copyCurrentOrigin = copyCurrentOrigin;
+
+function updateRegAvatarPreview(name) {
+    const avatarEl = document.getElementById('regAvatarPreview');
+    if (!avatarEl) return;
+    const seed = (name && name.trim()) ? name.trim() : 'Learner';
+    avatarEl.innerHTML = `<img src="https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}" class="w-full h-full object-cover">`;
+}
+if (typeof window !== 'undefined') window.updateRegAvatarPreview = updateRegAvatarPreview;
 
 function confirmGoogleAccountConnection() {
     const emailEl = document.getElementById('googleEmailInput');
@@ -1232,6 +1255,19 @@ function updateAuthUI() {
         if (userImgEl) {
             userImgEl.src = currentUser.picture || ('https://api.dicebear.com/7.x/bottts/svg?seed=' + encodeURIComponent(currentUser.name || 'User'));
         }
+
+        const lvlEl = document.getElementById('authProfileLevel');
+        const starsEl = document.getElementById('authProfileStars');
+        const xpEl = document.getElementById('authProfileXp');
+        if (lvlEl && typeof progress !== 'undefined') lvlEl.textContent = 'Level ' + (progress.unlockedLevel || 1);
+        if (starsEl && typeof progress !== 'undefined') {
+            let totalStars = 0;
+            if (progress.levelStars) {
+                Object.values(progress.levelStars).forEach(s => { totalStars += (Number(s) || 0); });
+            }
+            starsEl.textContent = totalStars + ' ★';
+        }
+        if (xpEl && typeof progress !== 'undefined') xpEl.textContent = (progress.xp || 0) + ' ⚡';
         if (syncTimeEl) {
             syncTimeEl.textContent = currentUser.lastSynced 
                 ? new Date(currentUser.lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1313,7 +1349,18 @@ function switchAuthTab(tabId) {
         if (tabGoogle) tabGoogle.classList.remove('hidden');
         activateBtn(btnGoogle);
         if (titleEl) titleEl.textContent = 'Continue with Google';
-        if (subEl) subEl.textContent = 'Fast, one-tap sign in with your Google account';
+        if (subEl) subEl.textContent = 'Fast, official sign-in with your Google account';
+        
+        const currentOrigin = (typeof window !== 'undefined' && window.location) 
+            ? (window.location.origin || (window.location.protocol + '//' + window.location.host)) 
+            : 'http://localhost:8080';
+        const originLabel = document.getElementById('googleCurrentOriginLabel');
+        if (originLabel) originLabel.textContent = currentOrigin;
+
+        const emailInput = document.getElementById('googleNameOrEmailInput');
+        if (emailInput && !emailInput.value) {
+            emailInput.value = localStorage.getItem('yakthung_last_google_email') || 'ag9tes.yt@gmail.com';
+        }
     }
 }
 
