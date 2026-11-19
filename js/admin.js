@@ -1,7 +1,8 @@
 /**
- * Yakthung Pan • Real-Time Admin Portal & Activity Telemetry Engine
+ * Yakthung Pan • Real-Time Enterprise Admin Portal & Activity Telemetry Engine
  * Features:
  *  - 100% Real-time updates via Firebase Firestore `onSnapshot` listeners
+ *  - Instant cross-device sync via persistent Cloud Hub
  *  - Instant sub-millisecond cross-tab broadcast via BroadcastChannel API
  *  - Live table insertion with glowing row animation & counter incrementing
  *  - Live Web Audio API synthesizer chime on incoming login/signup events
@@ -75,6 +76,14 @@ function isAuthorizedAdminEmail(email) {
     return list.includes(email.toLowerCase().trim());
 }
 
+function autofillDefaultPasscode() {
+    const input = document.getElementById('adminPasscodeInput');
+    if (input) {
+        input.value = DEFAULT_ADMIN_PASSCODE;
+        input.focus();
+    }
+}
+
 function handleAdminLoginSubmit(e) {
     if (e && e.preventDefault) e.preventDefault();
     const input = document.getElementById('adminPasscodeInput');
@@ -91,7 +100,6 @@ function handleAdminLoginSubmit(e) {
         showAdminToast('Welcome, Administrator!', '🛡️');
     } else {
         if (errEl) {
-            errEl.textContent = 'Invalid administrator passcode. Please try again.';
             errEl.classList.remove('hidden');
         }
         if (input) {
@@ -165,7 +173,7 @@ function getCurrentUserSafe() {
 }
 
 // =====================================================================
-// 2. REAL-TIME ENGINE (FIRESTORE SNAPSHOTS + BROADCASTCHANNEL + AUDIO)
+// 2. REAL-TIME ENGINE (FIRESTORE SNAPSHOTS + CLOUD HUB + AUDIO)
 // =====================================================================
 
 function initRealtimeEngine() {
@@ -181,7 +189,7 @@ function initRealtimeEngine() {
     // 2. Baseline local load
     loadInitialBaselineData();
 
-    // 3. Connect Cloud Hub Realtime (Universal cross-device sync between Phone App and Dashboard)
+    // 3. Connect Universal Cloud Hub (cross-device sync between Phone APK and Admin Dashboard)
     setupCloudHubRealtime();
 
     // 4. Connect Firestore Realtime `onSnapshot` listeners
@@ -333,7 +341,6 @@ function setupFirestoreRealtime() {
         usersUnsubscribe = db.collection('users').onSnapshot((snapshot) => {
             snapshot.docChanges().forEach(change => {
                 const data = change.doc.data();
-                const key = (data.email ? data.email.toLowerCase() : change.doc.id);
                 const updatedUser = {
                     userId: change.doc.id,
                     userName: data.name || data.username || 'Learner',
@@ -375,7 +382,6 @@ function setupBroadcastChannelRealtime() {
         realtimeBroadcastChannel = new BroadcastChannel('yakthung_admin_realtime');
         realtimeBroadcastChannel.onmessage = (event) => {
             if (event && event.data && event.data.type === 'new_activity' && event.data.entry) {
-                console.log('[Admin Realtime] Instant Broadcast received:', event.data.entry);
                 handleIncomingRealtimeEntry(event.data.entry, true);
             }
         };
@@ -443,7 +449,7 @@ function handleIncomingRealtimeEntry(entry, animate = true) {
     // Update KPIs instantly
     updateKPICards();
 
-    // If currently on logs view, prepend row with green pulse highlight
+    // If currently on logs view, prepend row with pulse highlight
     if (currentAdminTab === 'logs') {
         prependLogRowWithGlow(entry, entryKey);
     } else {
@@ -472,7 +478,7 @@ function prependLogRowWithGlow(log, entryKey) {
 
     const tr = document.createElement('tr');
     tr.id = 'row_' + entryKey;
-    tr.className = 'border-b border-slate-800/60 transition-all duration-700 text-xs bg-emerald-500/25 ring-1 ring-emerald-400';
+    tr.className = 'border-b border-white/[0.06] transition-all duration-500 text-xs row-live-highlight';
 
     const timeAgo = formatTimeAgo(log.timestamp);
     const fullTime = new Date(log.timestamp).toLocaleString();
@@ -481,46 +487,49 @@ function prependLogRowWithGlow(log, entryKey) {
     const userAvatar = getUserAvatarHtml(log.userName, log.email);
 
     tr.innerHTML = `
-        <td class="py-3 px-4">
-            <div class="flex items-center gap-2.5">
+        <td class="py-3.5 px-4">
+            <div class="flex items-center gap-3">
                 ${userAvatar}
                 <div>
-                    <div class="font-extrabold text-white flex items-center gap-1.5">
+                    <div class="font-extrabold text-white flex items-center gap-2">
                         <span>${escapeHtml(log.userName || 'Learner')}</span>
-                        <span class="px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950 text-[9px] font-black uppercase tracking-wider animate-pulse">LIVE</span>
+                        <span class="px-1.5 py-0.5 rounded-full bg-emerald-500 text-[#080c14] text-[9px] font-black uppercase tracking-wider animate-pulse">LIVE</span>
                     </div>
-                    <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(log.email || 'No email (Device ID)')}</div>
+                    <div class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(log.email || 'Device ID / Local User')}</div>
                 </div>
             </div>
         </td>
-        <td class="py-3 px-4">${actionBadge}</td>
-        <td class="py-3 px-4">${providerBadge}</td>
-        <td class="py-3 px-4">
-            <div class="flex items-center gap-1.5 font-bold">
-                <span class="text-amber-400">Lv.${log.level || 1}</span>
-                <span class="text-slate-500">•</span>
-                <span class="text-emerald-400">${log.xp || 0} XP</span>
+        <td class="py-3.5 px-4">${actionBadge}</td>
+        <td class="py-3.5 px-4">${providerBadge}</td>
+        <td class="py-3.5 px-4">
+            <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 font-black text-[11px] border border-amber-500/20">
+                    Lv.${log.level || 1}
+                </span>
+                <span class="text-xs font-mono font-bold text-emerald-400">
+                    ${(Number(log.xp) || 0).toLocaleString()} XP
+                </span>
             </div>
         </td>
-        <td class="py-3 px-4 text-slate-300">
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800/70 text-[10px] text-slate-300 border border-slate-700/50">
-                ${getDeviceIcon(log.device)} ${escapeHtml(log.device || 'Web Browser')}
+        <td class="py-3.5 px-4 text-slate-300">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#080c14] text-[11px] text-slate-300 border border-white/10 font-medium">
+                ${getDeviceIcon(log.device)} <span>${escapeHtml(log.device || 'Web Browser')}</span>
             </span>
         </td>
-        <td class="py-3 px-4 text-right">
-            <div class="font-bold text-emerald-300 text-[11px] live-time-ago" data-timestamp="${log.timestamp}">Just now</div>
-            <div class="text-[9px] text-slate-500 font-mono" title="${fullTime}">${fullTime}</div>
+        <td class="py-3.5 px-4 text-right">
+            <div class="font-bold text-emerald-400 text-xs live-time-ago" data-timestamp="${log.timestamp}">Just now</div>
+            <div class="text-[10px] text-slate-500 font-mono mt-0.5" title="${fullTime}">${fullTime}</div>
         </td>
     `;
 
     tbody.insertBefore(tr, tbody.firstChild);
 
-    // Fade out glow after 3 seconds
+    // Remove pulse after 3.5s
     setTimeout(() => {
-        tr.className = 'border-b border-slate-800/60 hover:bg-slate-800/30 transition-all duration-700 text-xs';
+        tr.className = 'border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors text-xs';
         const livePill = tr.querySelector('.animate-pulse');
         if (livePill) livePill.remove();
-    }, 3200);
+    }, 3500);
 
     if (countEl) countEl.textContent = `${cachedLogs.length} entries`;
 }
@@ -598,11 +607,11 @@ function updateSoundButtonUI() {
     if (isSoundEnabled) {
         if (iconEl) iconEl.textContent = '🔔';
         if (textEl) textEl.textContent = 'Chime On';
-        btn.className = 'p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer';
+        btn.className = 'p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#0d1524] hover:bg-[#131e33] text-emerald-400 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer';
     } else {
         if (iconEl) iconEl.textContent = '🔕';
         if (textEl) textEl.textContent = 'Muted';
-        btn.className = 'p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer';
+        btn.className = 'p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#080c14] hover:bg-white/[0.05] text-slate-400 border border-white/10 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer';
     }
 }
 
@@ -673,7 +682,7 @@ function simulateRealtimeLoginEvent() {
     handleIncomingRealtimeEntry(entry, true);
     pushToCloudHubDirect(entry);
 
-    showAdminToast(`⚡ Simulated Real-Time Login: ${randomName}`, '⚡');
+    showAdminToast(`⚡ Real-Time Login Simulated: ${randomName}`, '⚡');
 }
 
 async function pushToCloudHubDirect(entry) {
@@ -810,7 +819,7 @@ function updateKPICards() {
     if (totalLoginsEl) totalLoginsEl.textContent = totalLoginsCount.toLocaleString();
     if (activeTodayEl) activeTodayEl.textContent = Math.max(activeTodayCount, 1).toLocaleString();
     if (totalXpEl) totalXpEl.textContent = sumXp.toLocaleString() + ' XP';
-    if (avgLevelEl) avgLevelEl.textContent = 'Level ' + avgLevel + ' / 21';
+    if (avgLevelEl) avgLevelEl.textContent = 'Level ' + avgLevel;
 }
 
 // =====================================================================
@@ -825,9 +834,9 @@ function switchAdminTab(tabName) {
         const view = document.getElementById(`tabView_${t}`);
         if (btn) {
             if (t === tabName) {
-                btn.className = 'py-2 px-4 rounded-xl font-black text-xs bg-emerald-600 text-white shadow-md transition flex items-center gap-2';
+                btn.className = 'py-2 px-3.5 sm:px-4 rounded-xl font-black text-xs bg-emerald-500 text-[#080c14] shadow-md shadow-emerald-500/20 transition flex items-center gap-2 cursor-pointer shrink-0';
             } else {
-                btn.className = 'py-2 px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2';
+                btn.className = 'py-2 px-3.5 sm:px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-white/[0.05] transition flex items-center gap-2 cursor-pointer shrink-0';
             }
         }
         if (view) {
@@ -877,9 +886,10 @@ function renderLogsTable() {
     if (filtered.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="py-12 text-center text-slate-500 text-xs">
-                    <div class="text-2xl mb-2">🔍</div>
-                    No log events match your current filters.
+                <td colspan="6" class="py-14 text-center text-slate-500 text-xs">
+                    <div class="text-3xl mb-2">🔍</div>
+                    <div class="font-bold text-slate-300">No activity logs found</div>
+                    <p class="text-slate-500 text-[11px] mt-1">Try adjusting your search terms or filters</p>
                 </td>
             </tr>
         `;
@@ -894,33 +904,36 @@ function renderLogsTable() {
         const userAvatar = getUserAvatarHtml(log.userName, log.email);
 
         return `
-            <tr class="border-b border-slate-800/60 hover:bg-slate-800/30 transition text-xs">
-                <td class="py-3 px-4">
-                    <div class="flex items-center gap-2.5">
+            <tr class="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors text-xs">
+                <td class="py-3.5 px-4">
+                    <div class="flex items-center gap-3">
                         ${userAvatar}
                         <div>
-                            <div class="font-extrabold text-white">${escapeHtml(log.userName || 'Learner')}</div>
-                            <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(log.email || 'No email (Device ID)')}</div>
+                            <div class="font-bold text-white text-xs">${escapeHtml(log.userName || 'Learner')}</div>
+                            <div class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(log.email || 'Device ID / Local User')}</div>
                         </div>
                     </div>
                 </td>
-                <td class="py-3 px-4">${actionBadge}</td>
-                <td class="py-3 px-4">${providerBadge}</td>
-                <td class="py-3 px-4">
-                    <div class="flex items-center gap-1.5 font-bold">
-                        <span class="text-amber-400">Lv.${log.level || 1}</span>
-                        <span class="text-slate-500">•</span>
-                        <span class="text-emerald-400">${log.xp || 0} XP</span>
+                <td class="py-3.5 px-4">${actionBadge}</td>
+                <td class="py-3.5 px-4">${providerBadge}</td>
+                <td class="py-3.5 px-4">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 font-black text-[11px] border border-amber-500/20">
+                            Lv.${log.level || 1}
+                        </span>
+                        <span class="text-xs font-mono font-bold text-emerald-400">
+                            ${(Number(log.xp) || 0).toLocaleString()} XP
+                        </span>
                     </div>
                 </td>
-                <td class="py-3 px-4 text-slate-300">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800/70 text-[10px] text-slate-300 border border-slate-700/50">
-                        ${getDeviceIcon(log.device)} ${escapeHtml(log.device || 'Web Browser')}
+                <td class="py-3.5 px-4 text-slate-300">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#080c14] text-[11px] text-slate-300 border border-white/10 font-medium">
+                        ${getDeviceIcon(log.device)} <span>${escapeHtml(log.device || 'Web Browser')}</span>
                     </span>
                 </td>
-                <td class="py-3 px-4 text-right">
-                    <div class="font-bold text-white text-[11px] live-time-ago" data-timestamp="${log.timestamp}">${timeAgo}</div>
-                    <div class="text-[9px] text-slate-500 font-mono" title="${fullTime}">${fullTime}</div>
+                <td class="py-3.5 px-4 text-right">
+                    <div class="font-bold text-white text-xs live-time-ago" data-timestamp="${log.timestamp}">${timeAgo}</div>
+                    <div class="text-[10px] text-slate-500 font-mono mt-0.5" title="${fullTime}">${fullTime}</div>
                 </td>
             </tr>
         `;
@@ -943,7 +956,7 @@ function handleLogSearchInput(val) {
 }
 
 // =====================================================================
-// 7. LEARNERS ROSTER TAB
+// 7. LEARNERS DIRECTORY TAB
 // =====================================================================
 
 function renderLearnersTable() {
@@ -966,9 +979,10 @@ function renderLearnersTable() {
     if (filtered.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="py-12 text-center text-slate-500 text-xs">
-                    <div class="text-2xl mb-2">👤</div>
-                    No registered learners found matching "${escapeHtml(learnerSearchQuery)}".
+                <td colspan="6" class="py-14 text-center text-slate-500 text-xs">
+                    <div class="text-3xl mb-2">👤</div>
+                    <div class="font-bold text-slate-300">No learners found</div>
+                    <p class="text-slate-500 text-[11px] mt-1">No registered learners found matching "${escapeHtml(learnerSearchQuery)}"</p>
                 </td>
             </tr>
         `;
@@ -979,41 +993,44 @@ function renderLearnersTable() {
         const timeAgo = formatTimeAgo(user.lastActive);
         const providerBadge = getProviderBadge(user.provider);
         const userAvatar = getUserAvatarHtml(user.userName, user.email);
-        const levelPct = Math.min(100, Math.round(((Number(user.level) || 1) / 21) * 100));
+        const currentLevel = Number(user.level) || 1;
+        const levelPct = Math.min(100, Math.round((currentLevel / 21) * 100));
 
         return `
-            <tr class="border-b border-slate-800/60 hover:bg-slate-800/30 transition text-xs">
-                <td class="py-3 px-4">
-                    <div class="flex items-center gap-2.5">
+            <tr class="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors text-xs">
+                <td class="py-3.5 px-4">
+                    <div class="flex items-center gap-3">
                         ${userAvatar}
                         <div>
-                            <div class="font-extrabold text-white text-sm">${escapeHtml(user.userName || 'Learner')}</div>
-                            <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(user.email || 'Local User ID: ' + (user.userId || '—'))}</div>
+                            <div class="font-bold text-white text-sm">${escapeHtml(user.userName || 'Learner')}</div>
+                            <div class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(user.email || 'Local User ID: ' + (user.userId || '—'))}</div>
                         </div>
                     </div>
                 </td>
-                <td class="py-3 px-4">${providerBadge}</td>
-                <td class="py-3 px-4">
-                    <div class="space-y-1">
+                <td class="py-3.5 px-4">${providerBadge}</td>
+                <td class="py-3.5 px-4">
+                    <div class="space-y-1.5 min-w-[140px]">
                         <div class="flex items-center justify-between font-bold text-[11px]">
-                            <span class="text-amber-300">Level ${user.level || 1} / 21</span>
-                            <span class="text-slate-400">${levelPct}%</span>
+                            <span class="text-amber-300">Stage ${currentLevel} / 21</span>
+                            <span class="text-slate-400 font-mono">${levelPct}%</span>
                         </div>
-                        <div class="w-28 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-emerald-500 to-amber-400 rounded-full" style="width: ${levelPct}%"></div>
+                        <div class="w-full h-1.5 bg-[#080c14] rounded-full overflow-hidden border border-white/[0.06]">
+                            <div class="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 rounded-full" style="width: ${levelPct}%"></div>
                         </div>
                     </div>
                 </td>
-                <td class="py-3 px-4">
-                    <span class="font-black text-emerald-400 text-sm">${(Number(user.xp) || 0).toLocaleString()}</span>
-                    <span class="text-[10px] text-slate-400 font-bold ml-1">XP</span>
+                <td class="py-3.5 px-4">
+                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                        <span class="font-black text-emerald-400 text-xs font-mono">${(Number(user.xp) || 0).toLocaleString()}</span>
+                        <span class="text-[9px] text-emerald-300 font-bold">XP</span>
+                    </div>
                 </td>
-                <td class="py-3 px-4 text-slate-300 text-[11px]">
-                    <div class="font-bold text-white live-time-ago" data-timestamp="${user.lastActive}">${timeAgo}</div>
-                    <div class="text-[9px] text-slate-500">${escapeHtml(user.device || 'Web')}</div>
+                <td class="py-3.5 px-4 text-slate-300">
+                    <div class="font-bold text-white text-xs live-time-ago" data-timestamp="${user.lastActive}">${timeAgo}</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">${escapeHtml(user.device || 'Mobile App')}</div>
                 </td>
-                <td class="py-3 px-4 text-right">
-                    <button onclick="inspectLearnerDetail('${escapeAttr(user.userId || user.email)}')" class="px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-bold text-[10px] transition active:scale-95 cursor-pointer">
+                <td class="py-3.5 px-4 text-right">
+                    <button onclick="inspectLearnerDetail('${escapeAttr(user.userId || user.email)}')" class="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-emerald-500 hover:text-[#080c14] text-slate-300 border border-white/10 font-bold text-[11px] transition active:scale-95 cursor-pointer">
                         Inspect
                     </button>
                 </td>
@@ -1036,42 +1053,64 @@ function inspectLearnerDetail(key) {
     if (!modal || !content) return;
 
     const userAvatar = getUserAvatarHtml(user.userName, user.email, 'w-16 h-16 text-2xl');
-    const levelPct = Math.min(100, Math.round(((Number(user.level) || 1) / 21) * 100));
+    const currentLevel = Number(user.level) || 1;
+    const levelPct = Math.min(100, Math.round((currentLevel / 21) * 100));
 
     content.innerHTML = `
-        <div class="flex items-center gap-4 border-b border-slate-800 pb-4">
+        <div class="flex items-center gap-4 border-b border-white/10 pb-5">
             ${userAvatar}
-            <div>
-                <h3 class="text-lg font-black text-white">${escapeHtml(user.userName || 'Learner')}</h3>
-                <p class="text-xs text-slate-400 font-mono">${escapeHtml(user.email || 'Local User ID: ' + (user.userId || '—'))}</p>
-                <div class="mt-1 flex items-center gap-2">
+            <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-xl font-black text-white tracking-tight">${escapeHtml(user.userName || 'Learner')}</h3>
                     ${getProviderBadge(user.provider)}
-                    <span class="text-[10px] text-slate-400">Last active: ${formatTimeAgo(user.lastActive)}</span>
+                </div>
+                <p class="text-xs text-slate-400 font-mono">${escapeHtml(user.email || 'Local User ID: ' + (user.userId || '—'))}</p>
+                <div class="text-[11px] text-slate-400 flex items-center gap-1.5 pt-0.5">
+                    <span>Last active:</span>
+                    <span class="text-emerald-400 font-semibold">${formatTimeAgo(user.lastActive)}</span>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 py-4">
-            <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800">
-                <div class="text-[10px] font-bold text-slate-400 uppercase">Unlocked Mountain Level</div>
-                <div class="text-xl font-black text-amber-300 mt-1">Level ${user.level || 1} <span class="text-xs text-slate-400">/ 21</span></div>
-                <div class="w-full h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden">
-                    <div class="h-full bg-amber-400" style="width: ${levelPct}%"></div>
+        <div class="grid grid-cols-2 gap-3.5 py-4">
+            <div class="p-4 rounded-2xl bg-[#080c14] border border-white/10 space-y-2">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Mountain Trail Progress</div>
+                <div class="text-2xl font-black text-amber-300">Stage ${currentLevel} <span class="text-xs text-slate-400 font-normal">/ 21</span></div>
+                <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                    <div class="h-full bg-gradient-to-r from-emerald-500 to-amber-400" style="width: ${levelPct}%"></div>
                 </div>
+                <div class="text-[10px] text-slate-500 font-mono">${levelPct}% Course Completed</div>
             </div>
-            <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800">
-                <div class="text-[10px] font-bold text-slate-400 uppercase">Total XP Accumulated</div>
-                <div class="text-xl font-black text-emerald-400 mt-1">${(Number(user.xp) || 0).toLocaleString()} <span class="text-xs text-slate-400">XP</span></div>
-                <div class="text-[10px] text-slate-500 mt-1">Trail Mastery Rank</div>
+
+            <div class="p-4 rounded-2xl bg-[#080c14] border border-white/10 space-y-2">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Total XP Earned</div>
+                <div class="text-2xl font-black text-purple-300">${(Number(user.xp) || 0).toLocaleString()} <span class="text-xs text-slate-400 font-normal">XP</span></div>
+                <div class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <span>🏆</span> Trail Mastery Level
+                </div>
+                <div class="text-[10px] text-slate-500 font-mono">Rank: Trail Explorer</div>
             </div>
         </div>
 
-        <div class="space-y-2 border-t border-slate-800 pt-3">
-            <h4 class="text-xs font-bold text-slate-300">Recent User Telemetry</h4>
-            <div class="text-[11px] space-y-1 text-slate-400">
-                <div><strong class="text-slate-300">Device:</strong> ${escapeHtml(user.device || 'Web Browser')}</div>
-                <div><strong class="text-slate-300">Last Action:</strong> ${escapeHtml(user.lastAction || 'login')}</div>
-                <div><strong class="text-slate-300">Account ID:</strong> <span class="font-mono text-[10px] text-slate-500">${escapeHtml(user.userId || 'local')}</span></div>
+        <div class="p-4 rounded-2xl bg-[#080c14] border border-white/5 space-y-2.5">
+            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Device & Telemetry Details</h4>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                    <span class="text-slate-500 block text-[10px] uppercase font-bold">Client Environment</span>
+                    <span class="text-slate-200 font-medium">${escapeHtml(user.device || 'Android APK')}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block text-[10px] uppercase font-bold">Last Action</span>
+                    <span class="text-emerald-400 font-mono font-bold">${escapeHtml(user.lastAction || 'login')}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block text-[10px] uppercase font-bold">Authentication</span>
+                    <span class="text-slate-200 font-mono">${escapeHtml(user.provider || 'cloud')}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block text-[10px] uppercase font-bold">Account ID</span>
+                    <span class="text-slate-400 font-mono text-[10px]">${escapeHtml(user.userId || 'local_user')}</span>
+                </div>
             </div>
         </div>
     `;
@@ -1106,8 +1145,8 @@ function renderAnalyticsView() {
     const emailPct = Math.round((emailCount / total) * 100);
     const localPct = Math.round((localCount / total) * 100);
 
-    let lvl1_5 = 0;   // Beginners
-    let lvl6_13 = 0;  // Intermediate
+    let lvl1_5 = 0;   // Foundations & Consonants
+    let lvl6_13 = 0;  // Vowels, Matras & Words
     let lvl14_20 = 0; // Chuk-sak Half Letters
     let lvl21 = 0;    // Mountain Champions
 
@@ -1138,117 +1177,152 @@ function renderAnalyticsView() {
     if (!container) return;
 
     container.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Card 1: Auth Providers -->
+            <div class="glass-panel rounded-2xl p-6 space-y-5">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h4 class="font-extrabold text-sm text-white">Authentication Providers</h4>
-                        <p class="text-[10px] text-slate-400">Distribution of registered learners by sign-in method</p>
+                        <h4 class="font-black text-sm text-white tracking-tight">Authentication Distribution</h4>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Learners by sign-in method</p>
                     </div>
-                    <span class="text-xl">🔐</span>
+                    <div class="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-sm">
+                        🔐
+                    </div>
                 </div>
-                <div class="h-3 w-full bg-slate-800 rounded-full overflow-hidden flex">
-                    <div class="h-full bg-blue-500" style="width: ${googlePct}%" title="Google: ${googlePct}%"></div>
-                    <div class="h-full bg-emerald-500" style="width: ${emailPct}%" title="Email: ${emailPct}%"></div>
-                    <div class="h-full bg-amber-500" style="width: ${localPct}%" title="Local/Guest: ${localPct}%"></div>
+
+                <!-- Multi-segment bar -->
+                <div class="space-y-2">
+                    <div class="h-3 w-full bg-[#080c14] rounded-full overflow-hidden flex border border-white/[0.06]">
+                        <div class="h-full bg-blue-500 transition-all duration-700" style="width: ${googlePct}%" title="Google: ${googlePct}%"></div>
+                        <div class="h-full bg-emerald-500 transition-all duration-700" style="width: ${emailPct}%" title="Email: ${emailPct}%"></div>
+                        <div class="h-full bg-amber-500 transition-all duration-700" style="width: ${localPct}%" title="Local/Guest: ${localPct}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                        <span>Total: ${total} Learners</span>
+                        <span>100% Account Verification</span>
+                    </div>
                 </div>
-                <div class="grid grid-cols-3 gap-2 text-center pt-2">
-                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
-                        <div class="text-[10px] font-bold text-blue-400">🌐 Google</div>
-                        <div class="text-base font-black text-white mt-0.5">${googleCount}</div>
-                        <div class="text-[9px] text-slate-500">${googlePct}%</div>
+
+                <div class="grid grid-cols-3 gap-3 pt-2">
+                    <div class="p-3 rounded-xl bg-[#080c14] border border-white/5 space-y-1">
+                        <div class="text-[10px] font-bold text-blue-400 flex items-center gap-1">🌐 Google</div>
+                        <div class="text-xl font-black text-white">${googleCount}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${googlePct}% share</div>
                     </div>
-                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
-                        <div class="text-[10px] font-bold text-emerald-400">✉️ Email</div>
-                        <div class="text-base font-black text-white mt-0.5">${emailCount}</div>
-                        <div class="text-[9px] text-slate-500">${emailPct}%</div>
+                    <div class="p-3 rounded-xl bg-[#080c14] border border-white/5 space-y-1">
+                        <div class="text-[10px] font-bold text-emerald-400 flex items-center gap-1">✉️ Email</div>
+                        <div class="text-xl font-black text-white">${emailCount}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${emailPct}% share</div>
                     </div>
-                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
-                        <div class="text-[10px] font-bold text-amber-400">📱 Local / Guest</div>
-                        <div class="text-base font-black text-white mt-0.5">${localCount}</div>
-                        <div class="text-[9px] text-slate-500">${localPct}%</div>
+                    <div class="p-3 rounded-xl bg-[#080c14] border border-white/5 space-y-1">
+                        <div class="text-[10px] font-bold text-amber-400 flex items-center gap-1">📱 Local</div>
+                        <div class="text-xl font-black text-white">${localCount}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${localPct}% share</div>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
+            <!-- Card 2: Client Platforms -->
+            <div class="glass-panel rounded-2xl p-6 space-y-5">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h4 class="font-extrabold text-sm text-white">Client Platforms</h4>
-                        <p class="text-[10px] text-slate-400">Device environment used to access Yakthung Pan</p>
+                        <h4 class="font-black text-sm text-white tracking-tight">Client Platforms & Environments</h4>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Device breakdown accessing Yakthung Pan</p>
                     </div>
-                    <span class="text-xl">📲</span>
+                    <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-sm">
+                        📲
+                    </div>
                 </div>
-                <div class="h-3 w-full bg-slate-800 rounded-full overflow-hidden flex">
-                    <div class="h-full bg-emerald-500" style="width: ${apkPct}%" title="Android APK: ${apkPct}%"></div>
-                    <div class="h-full bg-indigo-500" style="width: ${mobPct}%" title="Mobile Web: ${mobPct}%"></div>
-                    <div class="h-full bg-slate-400" style="width: ${deskPct}%" title="Desktop: ${deskPct}%"></div>
+
+                <div class="space-y-2">
+                    <div class="h-3 w-full bg-[#080c14] rounded-full overflow-hidden flex border border-white/[0.06]">
+                        <div class="h-full bg-emerald-500 transition-all duration-700" style="width: ${apkPct}%" title="Android APK: ${apkPct}%"></div>
+                        <div class="h-full bg-purple-500 transition-all duration-700" style="width: ${mobPct}%" title="Mobile Web: ${mobPct}%"></div>
+                        <div class="h-full bg-slate-400 transition-all duration-700" style="width: ${deskPct}%" title="Desktop: ${deskPct}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                        <span>${apkPct}% Native Mobile App Adoption</span>
+                        <span>${logTotal} Events Audited</span>
+                    </div>
                 </div>
-                <div class="grid grid-cols-3 gap-2 text-center pt-2">
-                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
-                        <div class="text-[10px] font-bold text-emerald-400">🤖 Android APK</div>
-                        <div class="text-base font-black text-white mt-0.5">${apkCount}</div>
-                        <div class="text-[9px] text-slate-500">${apkPct}%</div>
+
+                <div class="grid grid-cols-3 gap-3 pt-2">
+                    <div class="p-3 rounded-xl bg-[#080c14] border border-white/5 space-y-1">
+                        <div class="text-[10px] font-bold text-emerald-400 flex items-center gap-1">🤖 APK App</div>
+                        <div class="text-xl font-black text-white">${apkCount}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${apkPct}% share</div>
                     </div>
-                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
-                        <div class="text-[10px] font-bold text-indigo-400">📱 Mobile Web</div>
-                        <div class="text-base font-black text-white mt-0.5">${mobileWebCount}</div>
-                        <div class="text-[9px] text-slate-500">${mobPct}%</div>
+                    <div class="p-3 rounded-xl bg-[#080c14] border border-white/5 space-y-1">
+                        <div class="text-[10px] font-bold text-purple-400 flex items-center gap-1">📱 Mobile</div>
+                        <div class="text-xl font-black text-white">${mobileWebCount}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${mobPct}% share</div>
                     </div>
-                    <div class="p-2 rounded-xl bg-slate-950 border border-slate-800">
-                        <div class="text-[10px] font-bold text-slate-300">💻 Desktop</div>
-                        <div class="text-base font-black text-white mt-0.5">${desktopCount}</div>
-                        <div class="text-[9px] text-slate-500">${deskPct}%</div>
+                    <div class="p-3 rounded-xl bg-[#080c14] border border-white/5 space-y-1">
+                        <div class="text-[10px] font-bold text-slate-300 flex items-center gap-1">💻 Desktop</div>
+                        <div class="text-xl font-black text-white">${desktopCount}</div>
+                        <div class="text-[10px] text-slate-500 font-mono">${deskPct}% share</div>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 md:col-span-2 space-y-4">
+            <!-- Card 3: Mountain Trail Progression Funnel -->
+            <div class="glass-panel rounded-2xl p-6 md:col-span-2 space-y-5">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h4 class="font-extrabold text-sm text-white">Learner Trail Milestones</h4>
-                        <p class="text-[10px] text-slate-400">How far learners have progressed through the 21 Mountain Levels</p>
+                        <h4 class="font-black text-sm text-white tracking-tight">Mountain Trail Progression Funnel</h4>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Learner distribution across the 21 Mountain trail stages</p>
                     </div>
-                    <span class="text-xl">🏔️</span>
+                    <div class="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-sm">
+                        🏔️
+                    </div>
                 </div>
-                <div class="space-y-3 pt-2">
+
+                <div class="space-y-4 pt-1">
                     <div>
-                        <div class="flex items-center justify-between text-xs font-bold mb-1">
-                            <span class="text-emerald-400">Levels 1-5 (Foundations & Consonants)</span>
-                            <span class="text-white">${lvl1_5} learners (${Math.round((lvl1_5/total)*100)}%)</span>
+                        <div class="flex items-center justify-between text-xs font-bold mb-1.5">
+                            <span class="text-emerald-400 flex items-center gap-1.5">
+                                <span>●</span> Stages 1–5: Foundations & Consonants (ᤰ–ᤘ)
+                            </span>
+                            <span class="text-slate-300 font-mono">${lvl1_5} learners (${Math.round((lvl1_5/total)*100)}%)</span>
                         </div>
-                        <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                            <div class="h-full bg-emerald-500 rounded-full" style="width: ${Math.round((lvl1_5/total)*100)}%"></div>
+                        <div class="h-2 w-full bg-[#080c14] rounded-full overflow-hidden border border-white/[0.06]">
+                            <div class="h-full bg-emerald-500 rounded-full transition-all duration-700" style="width: ${Math.round((lvl1_5/total)*100)}%"></div>
                         </div>
                     </div>
 
                     <div>
-                        <div class="flex items-center justify-between text-xs font-bold mb-1">
-                            <span class="text-teal-400">Levels 6-13 (Vowels, Matras & Words)</span>
-                            <span class="text-white">${lvl6_13} learners (${Math.round((lvl6_13/total)*100)}%)</span>
+                        <div class="flex items-center justify-between text-xs font-bold mb-1.5">
+                            <span class="text-teal-400 flex items-center gap-1.5">
+                                <span>●</span> Stages 6–13: Vowels, Matras & Words (ᤠ–ᤤ)
+                            </span>
+                            <span class="text-slate-300 font-mono">${lvl6_13} learners (${Math.round((lvl6_13/total)*100)}%)</span>
                         </div>
-                        <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                            <div class="h-full bg-teal-500 rounded-full" style="width: ${Math.round((lvl6_13/total)*100)}%"></div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="flex items-center justify-between text-xs font-bold mb-1">
-                            <span class="text-amber-400">Levels 14-20 (Chuk-sak Half Letters & Suffixes)</span>
-                            <span class="text-white">${lvl14_20} learners (${Math.round((lvl14_20/total)*100)}%)</span>
-                        </div>
-                        <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                            <div class="h-full bg-amber-500 rounded-full" style="width: ${Math.round((lvl14_20/total)*100)}%"></div>
+                        <div class="h-2 w-full bg-[#080c14] rounded-full overflow-hidden border border-white/[0.06]">
+                            <div class="h-full bg-teal-400 rounded-full transition-all duration-700" style="width: ${Math.round((lvl6_13/total)*100)}%"></div>
                         </div>
                     </div>
 
                     <div>
-                        <div class="flex items-center justify-between text-xs font-bold mb-1">
-                            <span class="text-purple-400">Level 21 (Limbu Grand Summit Master)</span>
-                            <span class="text-white">${lvl21} learners (${Math.round((lvl21/total)*100)}%)</span>
+                        <div class="flex items-center justify-between text-xs font-bold mb-1.5">
+                            <span class="text-amber-400 flex items-center gap-1.5">
+                                <span>●</span> Stages 14–20: Chuk-sak Half Letters & Syllables (ᤵ–᤹)
+                            </span>
+                            <span class="text-slate-300 font-mono">${lvl14_20} learners (${Math.round((lvl14_20/total)*100)}%)</span>
                         </div>
-                        <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                            <div class="h-full bg-purple-500 rounded-full" style="width: ${Math.round((lvl21/total)*100)}%"></div>
+                        <div class="h-2 w-full bg-[#080c14] rounded-full overflow-hidden border border-white/[0.06]">
+                            <div class="h-full bg-amber-400 rounded-full transition-all duration-700" style="width: ${Math.round((lvl14_20/total)*100)}%"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold mb-1.5">
+                            <span class="text-purple-400 flex items-center gap-1.5">
+                                <span>●</span> Stage 21: Limbu Grand Summit Champions (ᤕᤰᤌᤢᤱ ᤐᤠᤴ ᤛᤢᤶᤔᤠᤳ)
+                            </span>
+                            <span class="text-slate-300 font-mono">${lvl21} learners (${Math.round((lvl21/total)*100)}%)</span>
+                        </div>
+                        <div class="h-2 w-full bg-[#080c14] rounded-full overflow-hidden border border-white/[0.06]">
+                            <div class="h-full bg-purple-500 rounded-full transition-all duration-700" style="width: ${Math.round((lvl21/total)*100)}%"></div>
                         </div>
                     </div>
                 </div>
@@ -1267,7 +1341,7 @@ function renderAdminSettings() {
 
     const emails = getAuthorizedAdminEmails();
     listEl.innerHTML = emails.map(email => `
-        <div class="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+        <div class="flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-[#080c14] border border-white/5 text-xs">
             <span class="font-mono text-emerald-300 font-bold">${escapeHtml(email)}</span>
             <button onclick="removeAdminEmail('${escapeAttr(email)}')" class="text-rose-400 hover:text-rose-300 font-bold text-xs p-1 cursor-pointer">
                 ✕ Remove
@@ -1357,26 +1431,26 @@ function downloadBlob(content, filename, contentType) {
 function getActionBadge(action) {
     switch (action) {
         case 'login':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-black">🔑 Login</span>';
+            return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 text-[11px] font-bold">🔑 Login</span>';
         case 'signup':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-500/40 text-[10px] font-black">✨ Sign Up</span>';
+            return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/25 text-[11px] font-bold">✨ Sign Up</span>';
         case 'sync':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-950/80 text-blue-300 border border-blue-500/40 text-[10px] font-black">☁️ Cloud Sync</span>';
+            return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/25 text-[11px] font-bold">☁️ Cloud Sync</span>';
         case 'reset_pwd':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-500/40 text-[10px] font-black">📧 Pwd Reset</span>';
+            return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/25 text-[11px] font-bold">📧 Pwd Reset</span>';
         default:
-            return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-black">${escapeHtml(action)}</span>`;
+            return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.05] text-slate-300 border border-white/10 text-[11px] font-bold">${escapeHtml(action)}</span>`;
     }
 }
 
 function getProviderBadge(provider) {
     const p = (provider || '').toLowerCase();
     if (p.includes('google')) {
-        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/30 font-bold text-[10px]">🌐 Google</span>';
+        return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-300 border border-blue-500/25 font-bold text-[11px]">🌐 Google GIS</span>';
     } else if (p.includes('email')) {
-        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold text-[10px]">✉️ Email</span>';
+        return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-bold text-[11px]">✉️ Email</span>';
     } else {
-        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold text-[10px]">📱 Local</span>';
+        return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/25 font-bold text-[11px]">📱 Local Guest</span>';
     }
 }
 
@@ -1391,7 +1465,7 @@ function getUserAvatarHtml(name, email, sizeClass = 'w-8 h-8 text-xs') {
     const seed = encodeURIComponent(name || email || 'Learner');
     const imgUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${seed}`;
     return `
-        <div class="${sizeClass} rounded-full bg-slate-800 border border-emerald-500/40 overflow-hidden shrink-0 flex items-center justify-center">
+        <div class="${sizeClass} rounded-xl bg-[#080c14] border border-white/15 overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
             <img src="${imgUrl}" alt="Avatar" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='👤'">
         </div>
     `;
@@ -1434,10 +1508,10 @@ function showAdminToast(msg, icon = '🛡️') {
     if (!toast) {
         toast = document.createElement('div');
         toast.id = 'adminToast';
-        toast.className = 'fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl bg-slate-900 border border-emerald-500/40 text-white font-bold text-xs shadow-2xl flex items-center gap-2 transform transition-all duration-300 translate-y-10 opacity-0 pointer-events-none';
+        toast.className = 'fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl bg-[#0d1524]/95 border border-emerald-500/30 text-white font-bold text-xs shadow-2xl flex items-center gap-2.5 transform transition-all duration-300 translate-y-10 opacity-0 pointer-events-none backdrop-blur-xl';
         document.body.appendChild(toast);
     }
-    toast.innerHTML = `<span class="text-base">${icon}</span> <span>${escapeHtml(msg)}</span>`;
+    toast.innerHTML = `<span class="text-base">${icon}</span> <span class="tracking-wide">${escapeHtml(msg)}</span>`;
     toast.classList.remove('translate-y-10', 'opacity-0');
     setTimeout(() => {
         toast.classList.add('translate-y-10', 'opacity-0');

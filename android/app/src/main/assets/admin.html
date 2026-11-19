@@ -3,8 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Yakthung Pan • Admin Portal & Activity Telemetry</title>
+    <title>Yakthung Pan • Enterprise Admin Console & Telemetry</title>
     
+    <!-- Favicon & PWA info -->
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -14,12 +18,21 @@
                 extend: {
                     fontFamily: {
                         sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-                        limbu: ['"Noto Sans Limbu"', 'sans-serif']
+                        limbu: ['"Noto Sans Limbu"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace']
                     },
                     colors: {
-                        slate: {
-                            850: '#111827',
-                            950: '#070b12'
+                        brand: {
+                            obsidian: '#080c14',
+                            surface: '#0d1524',
+                            surfaceHover: '#131e33',
+                            border: 'rgba(255, 255, 255, 0.08)',
+                            borderHover: 'rgba(16, 185, 129, 0.35)',
+                            emerald: '#10b981',
+                            teal: '#14b8a6',
+                            amber: '#f59e0b',
+                            purple: '#a855f7',
+                            blue: '#3b82f6'
                         }
                     }
                 }
@@ -30,7 +43,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Limbu&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Limbu&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
     <!-- Firebase Compat SDKs for Live Firestore Telemetry -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -59,68 +72,144 @@
     </script>
 
     <style>
-        /* Custom scrollbar */
+        /* Sleek custom scrollbars */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: #090e17;
+            background: #080c14;
         }
         ::-webkit-scrollbar-thumb {
-            background: #1e293b;
+            background: #1c2840;
             border-radius: 9999px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #059669;
+            background: #10b981;
+        }
+
+        /* Ambient subtle grid pattern */
+        .ambient-grid {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        /* Glass surfaces */
+        .glass-panel {
+            background: rgba(13, 21, 36, 0.75);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-panel-hover {
+            transition: all 0.25s ease;
+        }
+        .glass-panel-hover:hover {
+            border-color: rgba(16, 185, 129, 0.35);
+            box-shadow: 0 12px 30px -10px rgba(16, 185, 129, 0.12);
+        }
+
+        /* Shimmer button animation */
+        @keyframes subtleShimmer {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .btn-shimmer {
+            background-size: 200% 200%;
+            animation: subtleShimmer 4s ease infinite;
+        }
+
+        /* Realtime row highlight pulse */
+        @keyframes liveInsertPulse {
+            0% {
+                background-color: rgba(16, 185, 129, 0.28);
+                box-shadow: inset 3px 0 0 #10b981;
+            }
+            100% {
+                background-color: transparent;
+                box-shadow: inset 0 0 0 transparent;
+            }
+        }
+        .row-live-highlight {
+            animation: liveInsertPulse 3.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
     </style>
 </head>
-<body class="bg-[#070b12] text-slate-100 font-sans min-h-screen antialiased flex flex-col selection:bg-emerald-500 selection:text-white">
+<body class="bg-[#080c14] text-slate-100 font-sans min-h-screen antialiased flex flex-col selection:bg-emerald-500 selection:text-white relative overflow-x-hidden ambient-grid">
+
+    <!-- Top Ambient Radiant Mesh Glow -->
+    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[420px] bg-gradient-to-b from-emerald-500/10 via-teal-500/5 to-transparent blur-3xl pointer-events-none -z-10"></div>
 
     <!-- ========================================================= -->
-    <!-- GATE OVERLAY: ADMIN PASSCODE LOCK (SHOWN WHEN NOT AUTHENTICATED) -->
+    <!-- GATE OVERLAY: ADMIN PASSCODE LOCK (SHOWN WHEN LOCKED)     -->
     <!-- ========================================================= -->
-    <div id="adminGateOverlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl">
-        <div class="w-full max-w-md bg-gradient-to-b from-[#131d2e] via-[#0f1728] to-[#090e17] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
+    <div id="adminGateOverlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#080c14]/90 backdrop-blur-2xl">
+        <div class="w-full max-w-md glass-panel rounded-3xl p-7 sm:p-9 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] border border-white/10 text-center space-y-6 relative overflow-hidden">
             
-            <div class="relative w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-0.5 shadow-xl">
-                <div class="w-full h-full bg-slate-900 rounded-[22px] flex items-center justify-center">
-                    <span class="font-limbu text-3xl text-emerald-400 font-bold">ᤕ</span>
+            <!-- Radiant orb behind emblem -->
+            <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-40 h-40 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none"></div>
+
+            <!-- Emblem Badge -->
+            <div class="relative w-18 h-18 mx-auto">
+                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-emerald-400 p-[1.5px] shadow-[0_0_30px_rgba(16,185,129,0.35)]">
+                    <div class="w-full h-full bg-[#0d1524] rounded-[14px] flex items-center justify-center">
+                        <span class="font-limbu text-3xl text-emerald-400 font-bold drop-shadow">ᤕ</span>
+                    </div>
                 </div>
-                <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-xs font-black shadow-md">
+                <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-[#080c14] flex items-center justify-center text-[11px] font-black shadow-lg">
                     🛡️
                 </div>
             </div>
 
-            <div>
-                <h1 class="text-xl font-black text-white tracking-tight">Yakthung Pan Admin Portal</h1>
-                <p class="text-xs text-slate-400 mt-1">Authorized personnel only • Telemetry & User Logins</p>
+            <!-- Title & Eyebrow -->
+            <div class="space-y-1.5">
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold tracking-widest uppercase">
+                    <span>Executive Gateway</span>
+                </div>
+                <h1 class="text-2xl font-black text-white tracking-tight">Yakthung Pan Admin</h1>
+                <p class="text-xs text-slate-400 font-medium">Restricted enterprise telemetry & user session audit</p>
             </div>
 
+            <!-- Passcode Form -->
             <form onsubmit="handleAdminLoginSubmit(event)" class="space-y-4 text-left">
-                <div>
-                    <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">Admin Passcode</label>
-                    <div class="relative flex items-center bg-slate-950 border border-slate-700/80 rounded-2xl focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition overflow-hidden">
-                        <span class="pl-3.5 text-base text-slate-400 select-none">🔒</span>
-                        <input id="adminPasscodeInput" type="password" placeholder="Enter administrator passcode" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-sm font-medium focus:outline-none">
-                        <button type="button" onclick="const el=document.getElementById('adminPasscodeInput'); el.type = el.type==='password'?'text':'password';" class="pr-3.5 pl-2 text-sm text-slate-400 hover:text-white transition" title="Show/Hide">👁️</button>
+                <div class="space-y-1.5">
+                    <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Administrator Passcode</label>
+                    <div class="relative flex items-center bg-[#080c14] border border-white/10 rounded-2xl focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200 overflow-hidden shadow-inner">
+                        <span class="pl-3.5 text-sm text-slate-500 select-none">🔒</span>
+                        <input id="adminPasscodeInput" type="password" placeholder="Enter administrator passcode" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-sm font-medium focus:outline-none font-mono">
+                        <button type="button" onclick="const el=document.getElementById('adminPasscodeInput'); el.type = el.type==='password'?'text':'password';" class="pr-3.5 pl-2 text-sm text-slate-500 hover:text-slate-300 transition" title="Show/Hide Passcode">👁️</button>
                     </div>
-                    <div class="flex items-center justify-between mt-1.5 px-1">
-                        <span class="text-[10px] text-slate-500">Default passcode: <code class="text-emerald-400 font-mono">yakthung2026</code></span>
+                    
+                    <!-- Quick Autofill Helper -->
+                    <div class="flex items-center justify-between text-[11px] pt-1">
+                        <span class="text-slate-500">Default passcode:</span>
+                        <button type="button" onclick="autofillDefaultPasscode()" class="text-emerald-400 hover:text-emerald-300 font-mono text-[11px] font-bold hover:underline transition flex items-center gap-1">
+                            <code>yakthung2026</code>
+                            <span class="text-[9px] text-slate-500 font-sans">(click to fill)</span>
+                        </button>
                     </div>
                 </div>
 
-                <div id="adminLoginError" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold"></div>
+                <!-- Error Notice -->
+                <div id="adminLoginError" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span id="adminLoginErrorText">Invalid administrator passcode. Please try again.</span>
+                </div>
 
-                <button type="submit" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 active:scale-95 text-white font-extrabold text-sm shadow-lg shadow-emerald-900/30 transition cursor-pointer">
-                    Unlock Admin Dashboard →
+                <!-- Submit Button -->
+                <button type="submit" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 btn-shimmer hover:opacity-95 active:scale-[0.98] text-[#080c14] font-black text-sm tracking-wide shadow-[0_10px_25px_rgba(16,185,129,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2">
+                    <span>Unlock Enterprise Console</span>
+                    <span class="text-base">→</span>
                 </button>
             </form>
 
-            <div class="pt-2 border-t border-white/5">
-                <a href="index.html" class="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-400 font-bold transition">
-                    ← Return to Learner App
+            <!-- Return link -->
+            <div class="pt-3 border-t border-white/[0.06]">
+                <a href="index.html" class="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 font-semibold transition">
+                    <span>←</span>
+                    <span>Return to Yakthung Pan Learner App</span>
                 </a>
             </div>
         </div>
@@ -129,29 +218,34 @@
     <!-- ========================================================= -->
     <!-- MAIN ADMIN DASHBOARD (SHOWN WHEN AUTHENTICATED)           -->
     <!-- ========================================================= -->
-    <div id="adminMainDashboard" class="hidden flex-1 flex flex-col">
+    <div id="adminMainDashboard" class="hidden flex-1 flex flex-col min-h-screen">
         
         <!-- TOP APP BAR -->
-        <header class="bg-slate-950/80 backdrop-blur-md border-b border-white/10 sticky top-0 z-30 px-4 sm:px-6 py-3 flex items-center justify-between">
+        <header class="bg-[#080c14]/85 backdrop-blur-xl border-b border-white/[0.08] sticky top-0 z-30 px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+            
+            <!-- Left: Brand lockup -->
             <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
-                    <span class="font-limbu text-xl text-white font-bold">ᤕ</span>
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.35)] shrink-0">
+                    <span class="font-limbu text-xl text-[#080c14] font-black">ᤕ</span>
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-sm sm:text-base font-black text-white leading-none">Yakthung Pan Admin</h1>
-                        <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                            🛡️ Portal
+                        <span class="text-sm font-black text-white tracking-tight leading-none">Yakthung Pan</span>
+                        <span class="text-slate-600 text-xs">/</span>
+                        <span class="text-xs font-semibold text-slate-300">Admin Console</span>
+                        <span class="hidden sm:inline-flex text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                            Enterprise v2.4
                         </span>
                     </div>
-                    <p class="text-[10px] text-slate-400 mt-0.5">Real-time user logins, registrations & learning progress</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5 hidden sm:block">Real-time Learner Logins, Signups & Mountain Trail Progress</p>
                 </div>
             </div>
 
-            <!-- Actions Right -->
+            <!-- Right Actions -->
             <div class="flex items-center gap-2 sm:gap-3">
-                <!-- Realtime Live Connection Badge -->
-                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-[11px] font-bold text-emerald-300">
+                
+                <!-- Realtime Live Connection Pill -->
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-[11px] font-bold text-emerald-300 shadow-sm">
                     <span class="relative flex h-2 w-2">
                         <span id="adminRealtimePing" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span id="adminRealtimeDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -159,129 +253,154 @@
                     <span id="adminConnectionText" class="tracking-wide">Realtime Cloud Live</span>
                 </div>
 
-                <!-- Sound Chime Toggle Button -->
-                <button id="adminSoundToggleBtn" onclick="toggleAdminSound()" class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Toggle audio chime on real-time logins">
+                <!-- Chime Audio Toggle Button -->
+                <button id="adminSoundToggleBtn" onclick="toggleAdminSound()" class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#0d1524] hover:bg-[#131e33] text-emerald-400 border border-white/10 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Toggle audio chime on real-time logins">
                     <span id="adminSoundIcon">🔔</span>
                     <span id="adminSoundText" class="hidden md:inline">Chime On</span>
                 </button>
 
-                <!-- Back to app button -->
-                <a href="index.html" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 border border-slate-700" title="Switch to Learner View">
+                <!-- Quick Simulate Event Button -->
+                <button onclick="simulateRealtimeLoginEvent()" class="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Inject a sample real-time login event">
+                    <span>⚡</span>
+                    <span class="hidden lg:inline">Test Event</span>
+                </button>
+
+                <!-- Return to App Button -->
+                <a href="index.html" class="px-3 py-1.5 rounded-xl bg-[#0d1524] hover:bg-[#131e33] text-slate-200 text-xs font-bold transition flex items-center gap-1.5 border border-white/10" title="Switch to Learner View">
                     <span>🏔️</span>
                     <span class="hidden md:inline">Learner App</span>
                 </a>
 
-                <!-- Lock / Logout -->
-                <button onclick="logoutAdmin()" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-bold transition flex items-center gap-1.5 border border-rose-500/30 active:scale-95 cursor-pointer" title="Lock Dashboard">
+                <!-- Lock Session -->
+                <button onclick="logoutAdmin()" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-bold transition flex items-center gap-1.5 border border-rose-500/25 active:scale-95 cursor-pointer" title="Lock Admin Session">
                     <span>🔒</span>
                     <span class="hidden sm:inline">Lock</span>
                 </button>
             </div>
         </header>
 
-        <!-- SUB-HEADER KPI METRICS CARDS -->
-        <div class="px-4 sm:px-6 py-4 bg-gradient-to-b from-slate-950/60 to-transparent">
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <!-- KPI METRICS BENTO GRID -->
+        <section class="px-4 sm:px-6 lg:px-8 py-5">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                 
-                <!-- KPI 1: Total Registered Learners -->
-                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1">
-                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
-                        <span>Learners</span>
-                        <span>👥</span>
+                <!-- KPI 1: Registered Learners -->
+                <div class="glass-panel glass-panel-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden group">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Learners Roster</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xs">
+                            👥
+                        </div>
                     </div>
-                    <div id="kpiTotalUsers" class="text-2xl font-black text-white">0</div>
-                    <div class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                        <span>●</span> Registered Accounts
+                    <div class="my-2">
+                        <div id="kpiTotalUsers" class="text-2xl sm:text-3xl font-black text-white tracking-tight">0</div>
+                    </div>
+                    <div class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1.5">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>Registered Accounts</span>
                     </div>
                 </div>
 
                 <!-- KPI 2: Total Logins Tracked -->
-                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1">
-                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
-                        <span>Total Logins</span>
-                        <span>🔑</span>
+                <div class="glass-panel glass-panel-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden group">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Total Logins</span>
+                        <div class="w-7 h-7 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-xs">
+                            🔑
+                        </div>
                     </div>
-                    <div id="kpiTotalLogins" class="text-2xl font-black text-emerald-400">0</div>
-                    <div class="text-[10px] text-slate-400 font-semibold">
-                        Google & Email sessions
+                    <div class="my-2">
+                        <div id="kpiTotalLogins" class="text-2xl sm:text-3xl font-black text-teal-300 tracking-tight">0</div>
+                    </div>
+                    <div class="text-[10px] text-slate-400 font-medium">
+                        Google GIS & Email Sessions
                     </div>
                 </div>
 
                 <!-- KPI 3: Active Learners Today -->
-                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1">
-                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
-                        <span>Active Today</span>
-                        <span>⚡</span>
+                <div class="glass-panel glass-panel-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden group">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Active Today</span>
+                        <div class="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xs">
+                            ⚡
+                        </div>
                     </div>
-                    <div id="kpiActiveToday" class="text-2xl font-black text-teal-300">0</div>
-                    <div class="text-[10px] text-slate-400 font-semibold">
+                    <div class="my-2">
+                        <div id="kpiActiveToday" class="text-2xl sm:text-3xl font-black text-amber-300 tracking-tight">0</div>
+                    </div>
+                    <div class="text-[10px] text-amber-400/80 font-medium">
                         Within past 24 hours
                     </div>
                 </div>
 
                 <!-- KPI 4: Total XP Accumulated -->
-                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1">
-                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
-                        <span>Total XP Earned</span>
-                        <span>🏆</span>
+                <div class="glass-panel glass-panel-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden group">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">XP Accumulated</span>
+                        <div class="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-xs">
+                            🏆
+                        </div>
                     </div>
-                    <div id="kpiTotalXp" class="text-xl sm:text-2xl font-black text-amber-300">0 XP</div>
-                    <div class="text-[10px] text-slate-400 font-semibold">
+                    <div class="my-2">
+                        <div id="kpiTotalXp" class="text-xl sm:text-2xl font-black text-purple-300 tracking-tight">0 XP</div>
+                    </div>
+                    <div class="text-[10px] text-purple-400/80 font-medium">
                         All lessons & quizzes
                     </div>
                 </div>
 
                 <!-- KPI 5: Avg Mountain Trail Level -->
-                <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition shadow-sm space-y-1 col-span-2 sm:col-span-1">
-                    <div class="flex items-center justify-between text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
-                        <span>Avg Trail Level</span>
-                        <span>🏔️</span>
+                <div class="glass-panel glass-panel-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden group col-span-2 sm:col-span-1">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Mountain Progress</span>
+                        <div class="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-xs">
+                            🏔️
+                        </div>
                     </div>
-                    <div id="kpiAvgLevel" class="text-2xl font-black text-purple-300">Level 1.0</div>
-                    <div class="text-[10px] text-purple-400 font-semibold">
-                        Out of 21 Levels
+                    <div class="my-2">
+                        <div id="kpiAvgLevel" class="text-2xl sm:text-3xl font-black text-blue-300 tracking-tight">Level 1.0</div>
+                    </div>
+                    <div class="text-[10px] text-blue-400/80 font-medium">
+                        Across 21 Mountain Stages
                     </div>
                 </div>
 
             </div>
-        </div>
+        </section>
 
-        <!-- TAB NAVIGATION BAR -->
-        <div class="px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
-            <div class="flex items-center gap-1.5 overflow-x-auto py-2">
-                <button id="tabBtn_logs" onclick="switchAdminTab('logs')" class="py-2 px-4 rounded-xl font-black text-xs bg-emerald-600 text-white shadow-md transition flex items-center gap-2 cursor-pointer">
+        <!-- TAB NAVIGATION BAR & GLOBAL ACTIONS -->
+        <div class="px-4 sm:px-6 lg:px-8 border-b border-white/[0.08] flex items-center justify-between flex-wrap gap-3 pb-3">
+            
+            <!-- Segmented Control Tabs -->
+            <div class="glass-panel p-1 rounded-2xl flex items-center gap-1 overflow-x-auto max-w-full">
+                <button id="tabBtn_logs" onclick="switchAdminTab('logs')" class="py-2 px-3.5 sm:px-4 rounded-xl font-black text-xs bg-emerald-500 text-[#080c14] shadow-md shadow-emerald-500/20 transition flex items-center gap-2 cursor-pointer shrink-0">
                     <span>📋</span>
                     <span>Activity & Logins</span>
                 </button>
-                <button id="tabBtn_learners" onclick="switchAdminTab('learners')" class="py-2 px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 cursor-pointer">
+                <button id="tabBtn_learners" onclick="switchAdminTab('learners')" class="py-2 px-3.5 sm:px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-white/[0.05] transition flex items-center gap-2 cursor-pointer shrink-0">
                     <span>👥</span>
-                    <span>Learners Roster</span>
+                    <span>Learners Directory</span>
                 </button>
-                <button id="tabBtn_analytics" onclick="switchAdminTab('analytics')" class="py-2 px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 cursor-pointer">
+                <button id="tabBtn_analytics" onclick="switchAdminTab('analytics')" class="py-2 px-3.5 sm:px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-white/[0.05] transition flex items-center gap-2 cursor-pointer shrink-0">
                     <span>📊</span>
                     <span>Visual Analytics</span>
                 </button>
-                <button id="tabBtn_settings" onclick="switchAdminTab('settings')" class="py-2 px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 cursor-pointer">
+                <button id="tabBtn_settings" onclick="switchAdminTab('settings')" class="py-2 px-3.5 sm:px-4 rounded-xl font-bold text-xs text-slate-400 hover:text-white hover:bg-white/[0.05] transition flex items-center gap-2 cursor-pointer shrink-0">
                     <span>⚙️</span>
-                    <span>Admin Settings</span>
+                    <span>Settings & Security</span>
                 </button>
             </div>
 
             <!-- Global Action Bar Right -->
-            <div class="flex items-center gap-2 py-2">
-                <button onclick="simulateRealtimeLoginEvent()" class="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Simulate a real-time login to test the live stream">
-                    <span>⚡</span>
-                    <span class="hidden sm:inline">Test Live Login</span>
-                </button>
-                <button onclick="initRealtimeEngine()" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition active:scale-95 text-xs flex items-center gap-1 font-bold cursor-pointer" title="Reconnect / Refresh Stream">
+            <div class="flex items-center gap-2">
+                <button onclick="initRealtimeEngine()" class="px-3 py-2 rounded-xl bg-[#0d1524] hover:bg-[#131e33] text-slate-300 hover:text-white border border-white/10 transition active:scale-95 text-xs flex items-center gap-1.5 font-bold cursor-pointer" title="Reconnect / Refresh Stream">
                     <span>🔄</span>
-                    <span class="hidden sm:inline">Refresh</span>
+                    <span class="hidden sm:inline">Refresh Data</span>
                 </button>
             </div>
         </div>
 
-        <!-- MAIN CONTENT AREA -->
-        <main class="flex-1 px-4 sm:px-6 py-6 overflow-y-auto">
+        <!-- MAIN VIEW CONTAINER -->
+        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
 
             <!-- ===================================================== -->
             <!-- VIEW 1: ACTIVITY & LOGINS AUDIT STREAM                -->
@@ -289,15 +408,17 @@
             <div id="tabView_logs" class="space-y-4">
                 
                 <!-- Filter & Search Toolbar -->
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
-                    <div class="flex items-center gap-2 flex-1">
-                        <div class="relative flex-1 max-w-sm">
+                <div class="glass-panel p-3.5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-2.5 flex-1">
+                        
+                        <!-- Search Input -->
+                        <div class="relative flex-1 min-w-[220px] max-w-sm">
                             <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 text-sm">🔍</span>
-                            <input oninput="handleLogSearchInput(this.value)" type="text" placeholder="Search learner name, email, or device..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-medium">
+                            <input oninput="handleLogSearchInput(this.value)" type="text" placeholder="Search learner, email, or device..." class="w-full bg-[#080c14] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-medium">
                         </div>
                         
                         <!-- Action filter -->
-                        <select onchange="handleLogActionFilterChange(this.value)" class="bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-300 font-bold focus:outline-none focus:border-emerald-500">
+                        <select onchange="handleLogActionFilterChange(this.value)" class="bg-[#080c14] border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-300 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer">
                             <option value="all">All Actions</option>
                             <option value="login">Logins Only</option>
                             <option value="signup">Sign Ups Only</option>
@@ -306,18 +427,18 @@
                         </select>
 
                         <!-- Provider filter -->
-                        <select onchange="handleLogProviderFilterChange(this.value)" class="bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-300 font-bold focus:outline-none focus:border-emerald-500">
+                        <select onchange="handleLogProviderFilterChange(this.value)" class="bg-[#080c14] border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-300 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer">
                             <option value="all">All Providers</option>
-                            <option value="google">Google</option>
+                            <option value="google">Google GIS</option>
                             <option value="email">Email</option>
-                            <option value="local">Local</option>
+                            <option value="local">Local Guest</option>
                         </select>
                     </div>
 
                     <!-- Actions Right -->
-                    <div class="flex items-center gap-2">
-                        <span id="adminLogsCount" class="text-xs font-mono text-slate-400 px-2">0 entries</span>
-                        <button onclick="exportLogsToCSV()" class="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
+                    <div class="flex items-center gap-3">
+                        <span id="adminLogsCount" class="text-xs font-mono text-slate-400 bg-white/[0.03] px-2.5 py-1 rounded-lg border border-white/[0.06]">0 entries</span>
+                        <button onclick="exportLogsToCSV()" class="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95">
                             <span>📥</span>
                             <span>Export CSV</span>
                         </button>
@@ -325,22 +446,25 @@
                 </div>
 
                 <!-- Logs Table Card -->
-                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+                <div class="glass-panel rounded-2xl overflow-hidden shadow-2xl">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="border-b border-slate-800 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest bg-slate-950/60">
+                                <tr class="border-b border-white/[0.08] text-[10px] font-extrabold text-slate-400 uppercase tracking-widest bg-[#080c14]/60">
                                     <th class="py-3.5 px-4">Learner Profile</th>
                                     <th class="py-3.5 px-4">Action</th>
-                                    <th class="py-3.5 px-4">Provider</th>
-                                    <th class="py-3.5 px-4">Trail Progress</th>
-                                    <th class="py-3.5 px-4">Platform / Device</th>
+                                    <th class="py-3.5 px-4">Auth Method</th>
+                                    <th class="py-3.5 px-4">Mountain Trail Progress</th>
+                                    <th class="py-3.5 px-4">Platform / Client</th>
                                     <th class="py-3.5 px-4 text-right">Timestamp</th>
                                 </tr>
                             </thead>
-                            <tbody id="adminLogsTbody" class="divide-y divide-slate-800/40">
+                            <tbody id="adminLogsTbody" class="divide-y divide-white/[0.04]">
                                 <tr>
-                                    <td colspan="6" class="py-12 text-center text-slate-500 text-xs">Loading activity logs...</td>
+                                    <td colspan="6" class="py-14 text-center text-slate-500 text-xs">
+                                        <div class="inline-block w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                                        <div>Connecting to real-time telemetry stream...</div>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -350,19 +474,19 @@
             </div>
 
             <!-- ===================================================== -->
-            <!-- VIEW 2: LEARNERS ROSTER (USERS DIRECTORY)             -->
+            <!-- VIEW 2: LEARNERS DIRECTORY (ROSTER)                   -->
             <!-- ===================================================== -->
             <div id="tabView_learners" class="hidden space-y-4">
                 
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
+                <div class="glass-panel p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div class="relative flex-1 max-w-sm">
                         <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 text-sm">🔍</span>
-                        <input oninput="handleLearnerSearchInput(this.value)" type="text" placeholder="Search learner by username or email..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-medium">
+                        <input oninput="handleLearnerSearchInput(this.value)" type="text" placeholder="Search learner by username or email..." class="w-full bg-[#080c14] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-medium">
                     </div>
 
-                    <div class="flex items-center gap-2">
-                        <span id="adminLearnersCount" class="text-xs font-mono text-slate-400 px-2">0 learners</span>
-                        <button onclick="exportLearnersToCSV()" class="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
+                    <div class="flex items-center gap-3">
+                        <span id="adminLearnersCount" class="text-xs font-mono text-slate-400 bg-white/[0.03] px-2.5 py-1 rounded-lg border border-white/[0.06]">0 learners</span>
+                        <button onclick="exportLearnersToCSV()" class="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95">
                             <span>📥</span>
                             <span>Export Roster CSV</span>
                         </button>
@@ -370,11 +494,11 @@
                 </div>
 
                 <!-- Learners Table Card -->
-                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+                <div class="glass-panel rounded-2xl overflow-hidden shadow-2xl">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="border-b border-slate-800 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest bg-slate-950/60">
+                                <tr class="border-b border-white/[0.08] text-[10px] font-extrabold text-slate-400 uppercase tracking-widest bg-[#080c14]/60">
                                     <th class="py-3.5 px-4">Learner</th>
                                     <th class="py-3.5 px-4">Auth Method</th>
                                     <th class="py-3.5 px-4">Mountain Trail Level</th>
@@ -383,9 +507,12 @@
                                     <th class="py-3.5 px-4 text-right">Details</th>
                                 </tr>
                             </thead>
-                            <tbody id="adminLearnersTbody" class="divide-y divide-slate-800/40">
+                            <tbody id="adminLearnersTbody" class="divide-y divide-white/[0.04]">
                                 <tr>
-                                    <td colspan="6" class="py-12 text-center text-slate-500 text-xs">Loading learners roster...</td>
+                                    <td colspan="6" class="py-14 text-center text-slate-500 text-xs">
+                                        <div class="inline-block w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                                        <div>Loading learners directory...</div>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -399,36 +526,43 @@
             <!-- ===================================================== -->
             <div id="tabView_analytics" class="hidden space-y-4">
                 <div id="analyticsChartsContainer">
-                    <div class="py-12 text-center text-slate-500 text-xs">Computing visual analytics...</div>
+                    <div class="py-14 text-center text-slate-500 text-xs">
+                        <div class="inline-block w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <div>Computing visual analytics...</div>
+                    </div>
                 </div>
             </div>
 
             <!-- ===================================================== -->
             <!-- VIEW 4: ADMIN SETTINGS & SECURITY                     -->
             <!-- ===================================================== -->
-            <div id="tabView_settings" class="hidden space-y-6 max-w-2xl">
+            <div id="tabView_settings" class="hidden space-y-6 max-w-3xl">
                 
                 <!-- Card 1: Passcode -->
-                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-3">
+                <div class="glass-panel rounded-2xl p-6 space-y-4">
                     <div class="flex items-center justify-between">
-                        <div>
+                        <div class="space-y-1">
                             <h3 class="font-black text-sm text-white">Administrator Passcode</h3>
-                            <p class="text-xs text-slate-400">Controls lockscreen access to this Admin Portal</p>
+                            <p class="text-xs text-slate-400">Controls lockscreen access to this Admin Console</p>
                         </div>
-                        <button onclick="changeAdminPasscode()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition active:scale-95 cursor-pointer">
+                        <button onclick="changeAdminPasscode()" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#080c14] font-black text-xs transition active:scale-95 cursor-pointer">
                             🔑 Change Passcode
                         </button>
+                    </div>
+                    <div class="p-3 rounded-xl bg-[#080c14] border border-white/5 flex items-center justify-between text-xs font-mono">
+                        <span class="text-slate-400">Current Status:</span>
+                        <span class="text-emerald-400 font-bold">Active & Protected</span>
                     </div>
                 </div>
 
                 <!-- Card 2: Authorized Admin Emails -->
-                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
+                <div class="glass-panel rounded-2xl p-6 space-y-4">
                     <div class="flex items-center justify-between">
-                        <div>
+                        <div class="space-y-1">
                             <h3 class="font-black text-sm text-white">Authorized Admin Emails</h3>
-                            <p class="text-xs text-slate-400">Users logged in with these emails auto-unlock admin access</p>
+                            <p class="text-xs text-slate-400">Users logged in with these emails auto-unlock administrator privileges</p>
                         </div>
-                        <button onclick="addAdminEmail()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition cursor-pointer">
+                        <button onclick="addAdminEmail()" class="px-3 py-1.5 rounded-xl bg-[#080c14] hover:bg-white/[0.05] text-white font-bold text-xs border border-white/10 transition cursor-pointer">
                             + Add Email
                         </button>
                     </div>
@@ -436,14 +570,37 @@
                     <div id="adminEmailsList" class="space-y-2"></div>
                 </div>
 
-                <!-- Card 3: Danger Zone -->
-                <div class="bg-rose-950/20 border border-rose-900/40 rounded-3xl p-5 space-y-3">
-                    <div>
-                        <h3 class="font-black text-sm text-rose-300">Telemetry Maintenance</h3>
-                        <p class="text-xs text-slate-400">Reset or purge local activity telemetry storage</p>
+                <!-- Card 3: Cloud Telemetry Hub Status -->
+                <div class="glass-panel rounded-2xl p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div class="space-y-1">
+                            <h3 class="font-black text-sm text-white">Universal Cloud Telemetry Hub</h3>
+                            <p class="text-xs text-slate-400">Provides live cross-device sync between Android APK, Mobile Web, and Dashboard</p>
+                        </div>
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            Active
+                        </span>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-[#080c14] border border-white/5 space-y-2 text-xs font-mono">
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-400">Hub Object ID:</span>
+                            <span class="text-slate-200">ff808181a09d98f701a1ea6ca68a0940</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-400">Sync Interval:</span>
+                            <span class="text-emerald-400">3 seconds (Realtime)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 4: Danger Zone -->
+                <div class="rounded-2xl p-6 space-y-4 bg-rose-950/20 border border-rose-900/30">
+                    <div class="space-y-1">
+                        <h3 class="font-black text-sm text-rose-300">Telemetry Data Maintenance</h3>
+                        <p class="text-xs text-slate-400">Reset or purge locally cached telemetry stream entries</p>
                     </div>
                     <div>
-                        <button onclick="clearAllAdminLogs()" class="px-4 py-2 rounded-xl bg-rose-600/30 hover:bg-rose-600 text-rose-200 border border-rose-500/40 font-bold text-xs transition active:scale-95 cursor-pointer">
+                        <button onclick="clearAllAdminLogs()" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-200 border border-rose-500/40 font-bold text-xs transition active:scale-95 cursor-pointer">
                             🧹 Clear Local Activity Logs
                         </button>
                     </div>
@@ -457,9 +614,9 @@
     <!-- ========================================================= -->
     <!-- LEARNER DETAIL MODAL                                      -->
     <!-- ========================================================= -->
-    <div id="adminDetailModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-        <div class="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 relative">
-            <button onclick="closeAdminDetailModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold transition">
+    <div id="adminDetailModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#080c14]/80 backdrop-blur-xl">
+        <div class="w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4 relative border border-white/10">
+            <button onclick="closeAdminDetailModal()" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#080c14] hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold transition cursor-pointer">
                 ✕
             </button>
             <div id="adminDetailModalContent"></div>
