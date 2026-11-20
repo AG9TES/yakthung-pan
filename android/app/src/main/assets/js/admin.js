@@ -244,6 +244,8 @@ function teardownRealtimeListeners() {
 // Universal Cloud Telemetry Sync between App & Dashboard
 var CLOUD_HUB_OBJECT_ID = 'ff808181a09d98f701a1ea6ca68a0940';
 var CLOUD_HUB_URL = 'https://api.restful-api.dev/objects/' + CLOUD_HUB_OBJECT_ID;
+var CLOUD_PROGRESS_STORAGE_ID = 'ff808181a09d98f701a1f3bdd6445cbc';
+var CLOUD_PROGRESS_URL = 'https://api.restful-api.dev/objects/' + CLOUD_PROGRESS_STORAGE_ID;
 var cloudHubPollTimer = null;
 var isFirstCloudHubLoad = true;
 
@@ -278,7 +280,7 @@ async function pollCloudHub() {
             }
         }
 
-        // Merge learners
+        // Merge learners from Telemetry Hub
         if (data.learners && typeof data.learners === 'object') {
             Object.values(data.learners).forEach(user => {
                 updateLearnerInRoster(user);
@@ -288,6 +290,41 @@ async function pollCloudHub() {
                 renderCurrentTab();
             }
         }
+
+        // Also query Cloud Progress Hub for live Mountain Trail stages & XP
+        try {
+            const pRes = await fetch(CLOUD_PROGRESS_URL, { cache: 'no-store' });
+            if (pRes.ok) {
+                const pJson = await pRes.json();
+                const pUsers = (pJson.data && pJson.data.users) || {};
+                let hasUpdates = false;
+                for (const [key, pUser] of Object.entries(pUsers)) {
+                    if (!pUser) continue;
+                    const email = (pUser.email || '').toLowerCase().trim();
+                    const name = pUser.name || (email ? email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Learner');
+                    const lvl = Number(pUser.unlockedLevel || pUser.level) || 1;
+                    const xp = Number(pUser.xp) || 0;
+                    const lrnId = email || key;
+                    updateLearnerInRoster({
+                        userId: lrnId,
+                        userName: name,
+                        email: email,
+                        level: lvl,
+                        xp: xp,
+                        lastActive: pUser.syncedAt || new Date().toISOString(),
+                        device: pUser.device || 'Learner App',
+                        provider: pUser.provider || 'google'
+                    });
+                    hasUpdates = true;
+                }
+                if (hasUpdates) {
+                    updateKPICards();
+                    if (currentAdminTab === 'learners') {
+                        renderLearnersTable();
+                    }
+                }
+            }
+        } catch (pe) {}
     } catch (e) {
         console.warn('[Admin Realtime] Cloud hub poll notice:', e);
     }
@@ -911,22 +948,53 @@ function mergeLogsIntoCache(newLogs) {
 
 function updateKPICards() {
     const totalUsersEl = document.getElementById('kpiTotalUsers');
+    const newTodayEl = document.getElementById('kpiNewToday');
+    const onlineNowEl = document.getElementById('kpiOnlineNow');
+    const dailyLoginsEl = document.getElementById('kpiDailyLogins');
     const totalLoginsEl = document.getElementById('kpiTotalLogins');
     const activeTodayEl = document.getElementById('kpiActiveToday');
     const totalXpEl = document.getElementById('kpiTotalXp');
     const avgLevelEl = document.getElementById('kpiAvgLevel');
 
     const totalLearners = Math.max(cachedLearners.length, 1);
-    const loginLogs = cachedLogs.filter(l => l.action === 'login' || l.action === 'signup');
-    const totalLoginsCount = loginLogs.length;
-
+    
+    // Time calculations
     const now = Date.now();
+    const fifteenMinsMs = 15 * 60 * 1000;
     const oneDayMs = 24 * 60 * 60 * 1000;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTodayMs = startOfToday.getTime();
+
+    // 1. Online Right Now (presence within 15 mins)
+    const onlineNowCount = cachedLearners.filter(u => {
+        const t = new Date(u.lastActive || 0).getTime();
+        return (now - t) < fifteenMinsMs;
+    }).length;
+
+    // 2. Active Today (DAU within 24h)
     const activeTodayCount = cachedLearners.filter(u => {
         const t = new Date(u.lastActive || 0).getTime();
         return (now - t) < oneDayMs;
     }).length;
 
+    // 3. Daily Logins (Today) vs Total Logins
+    const todayLogins = cachedLogs.filter(l => {
+        const isLogin = l.action === 'login' || l.action === 'app_launch';
+        const t = new Date(l.timestamp || 0).getTime();
+        return isLogin && t >= startOfTodayMs;
+    }).length;
+
+    const totalLoginsCount = cachedLogs.filter(l => l.action === 'login' || l.action === 'signup' || l.action === 'app_launch').length;
+
+    // 4. New Registrations Today
+    const todaySignups = cachedLogs.filter(l => {
+        const isSignup = l.action === 'signup';
+        const t = new Date(l.timestamp || 0).getTime();
+        return isSignup && t >= startOfTodayMs;
+    }).length;
+
+    // 5. XP and Mountain Progress
     let sumXp = 0;
     let sumLevel = 0;
     cachedLearners.forEach(u => {
@@ -936,7 +1004,10 @@ function updateKPICards() {
 
     const avgLevel = (sumLevel / totalLearners).toFixed(1);
 
-    if (totalUsersEl) totalUsersEl.textContent = totalLearners.toLocaleString();
+    if (totalUsersEl) totalUsersEl.textContent = cachedLearners.length.toLocaleString();
+    if (newTodayEl) newTodayEl.textContent = `+${todaySignups} Today`;
+    if (onlineNowEl) onlineNowEl.textContent = `${onlineNowCount} Online`;
+    if (dailyLoginsEl) dailyLoginsEl.textContent = `${todayLogins} Logins`;
     if (totalLoginsEl) totalLoginsEl.textContent = totalLoginsCount.toLocaleString();
     if (activeTodayEl) activeTodayEl.textContent = Math.max(activeTodayCount, 1).toLocaleString();
     if (totalXpEl) totalXpEl.textContent = sumXp.toLocaleString() + ' XP';
@@ -1117,6 +1188,13 @@ function renderLearnersTable() {
         const currentLevel = Number(user.level) || 1;
         const levelPct = Math.min(100, Math.round((currentLevel / 21) * 100));
 
+        const now = Date.now();
+        const lastActiveMs = new Date(user.lastActive || 0).getTime();
+        const isOnline = (now - lastActiveMs) < (15 * 60 * 1000);
+        const onlineIndicator = isOnline
+            ? `<div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-black text-[10px] animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Online Now</div>`
+            : `<div class="font-bold text-slate-300 text-xs live-time-ago" data-timestamp="${user.lastActive}">${timeAgo}</div>`;
+
         return `
             <tr class="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors text-xs">
                 <td class="py-3.5 px-4">
@@ -1147,8 +1225,8 @@ function renderLearnersTable() {
                     </div>
                 </td>
                 <td class="py-3.5 px-4 text-slate-300">
-                    <div class="font-bold text-white text-xs live-time-ago" data-timestamp="${user.lastActive}">${timeAgo}</div>
-                    <div class="text-[10px] text-slate-500 mt-0.5">${escapeHtml(user.device || 'Mobile App')}</div>
+                    ${onlineIndicator}
+                    <div class="text-[10px] text-slate-500 mt-0.5">${escapeHtml(user.device || 'Learner App')}</div>
                 </td>
                 <td class="py-3.5 px-4 text-right">
                     <button onclick="inspectLearnerDetail('${escapeAttr(user.userId || user.email)}')" class="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-emerald-500 hover:text-[#080c14] text-slate-300 border border-white/10 font-bold text-[11px] transition active:scale-95 cursor-pointer">
@@ -1166,7 +1244,7 @@ function handleLearnerSearchInput(val) {
 }
 
 function inspectLearnerDetail(key) {
-    const user = cachedLearners.find(u => (u.userId === key || u.email === key));
+    const user = cachedLearners.find(u => (u.userId === key || u.email === key || (u.email && key && u.email.toLowerCase() === key.toLowerCase())));
     if (!user) return;
 
     const modal = document.getElementById('adminDetailModal');
@@ -1176,62 +1254,139 @@ function inspectLearnerDetail(key) {
     const userAvatar = getUserAvatarHtml(user.userName, user.email, 'w-16 h-16 text-2xl');
     const currentLevel = Number(user.level) || 1;
     const levelPct = Math.min(100, Math.round((currentLevel / 21) * 100));
+    const now = Date.now();
+    const lastActiveMs = new Date(user.lastActive || 0).getTime();
+    const isOnline = (now - lastActiveMs) < (15 * 60 * 1000);
+
+    const onlineBadge = isOnline
+        ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-extrabold text-[11px] animate-pulse"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Online Now</span>`
+        : `<span class="text-slate-400 text-xs font-semibold">Active ${formatTimeAgo(user.lastActive)}</span>`;
+
+    // 21 Mountain Trail Stage Titles
+    const stageTitles = [
+        "Row 1: Ka – Nga", "Row 2: Cha – Na", "Row 3: Ta – Na", "Row 4: Ta – Ma",
+        "Row 5: Ya – Wa", "Row 6: Sha – Ha", "Vowel Matras: Aa, I, U", "Vowel Matras: E, O, Ai, Au",
+        "Subjoined: Ya, Ra", "Subjoined: La, Wa", "Final Consonants 1", "Final Consonants 2",
+        "Basic Greetings", "Family & Kinship", "Numbers 1–10", "Colors & Nature",
+        "Food & Daily Life", "Time & Calendar", "Short Sentences", "Cultural Dialogue",
+        "Sirijonga Summit Mastery"
+    ];
+
+    let stagesHtml = '';
+    for (let i = 1; i <= 21; i++) {
+        const title = stageTitles[i - 1] || `Stage ${i}`;
+        let statusBadge = '';
+        let cardStyle = '';
+        if (i < currentLevel) {
+            statusBadge = '<span class="text-emerald-400 font-bold text-[10px]">⭐ Done</span>';
+            cardStyle = 'bg-emerald-500/10 border-emerald-500/25 text-emerald-200';
+        } else if (i === currentLevel) {
+            statusBadge = '<span class="text-amber-300 font-black text-[10px] animate-pulse">🧗 Current</span>';
+            cardStyle = 'bg-amber-500/15 border-amber-400/50 text-amber-200 ring-1 ring-amber-400/40 shadow-sm';
+        } else {
+            statusBadge = '<span class="text-slate-600 font-medium text-[10px]">🔒 Locked</span>';
+            cardStyle = 'bg-[#060a12]/70 border-white/5 text-slate-500 opacity-60';
+        }
+
+        stagesHtml += `
+            <div class="p-2 rounded-xl border ${cardStyle} flex items-center justify-between gap-1.5 transition">
+                <div class="min-w-0">
+                    <div class="font-bold text-xs truncate">Stg ${i}</div>
+                    <div class="text-[9px] text-slate-400 truncate">${title}</div>
+                </div>
+                <div class="shrink-0">${statusBadge}</div>
+            </div>
+        `;
+    }
+
+    // Filter recent individual audit logs
+    const userLogs = cachedLogs.filter(l => (
+        l.userId === key || l.email === key || (user.email && l.email && l.email.toLowerCase() === user.email.toLowerCase())
+    )).slice(0, 8);
+
+    let logsHtml = '';
+    if (userLogs.length > 0) {
+        logsHtml = userLogs.map(l => {
+            const time = formatTimeAgo(l.timestamp);
+            const badge = getActionBadge(l.action);
+            return `
+                <div class="flex items-center justify-between py-2 border-b border-white/5 text-xs">
+                    <div class="flex items-center gap-2 min-w-0">
+                        ${badge}
+                        <span class="text-slate-300 font-medium truncate">${escapeHtml(l.details || l.action)}</span>
+                    </div>
+                    <span class="text-[10px] text-slate-500 font-mono shrink-0 pl-2">${time}</span>
+                </div>
+            `;
+        }).join('');
+    } else {
+        logsHtml = '<div class="text-xs text-slate-500 py-3 text-center">No individual telemetry events recorded yet.</div>';
+    }
 
     content.innerHTML = `
-        <div class="flex items-center gap-4 border-b border-white/10 pb-5">
-            ${userAvatar}
-            <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                    <h3 class="text-xl font-black text-white tracking-tight">${escapeHtml(user.userName || 'Learner')}</h3>
-                    ${getProviderBadge(user.provider)}
+        <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div class="flex items-center gap-3.5">
+                ${userAvatar}
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-lg font-black text-white tracking-tight">${escapeHtml(user.userName || 'Learner')}</h3>
+                        ${getProviderBadge(user.provider)}
+                    </div>
+                    <p class="text-xs text-slate-400 font-mono">${escapeHtml(user.email || 'Local User ID: ' + (user.userId || '—'))}</p>
                 </div>
-                <p class="text-xs text-slate-400 font-mono">${escapeHtml(user.email || 'Local User ID: ' + (user.userId || '—'))}</p>
-                <div class="text-[11px] text-slate-400 flex items-center gap-1.5 pt-0.5">
-                    <span>Last active:</span>
-                    <span class="text-emerald-400 font-semibold">${formatTimeAgo(user.lastActive)}</span>
-                </div>
+            </div>
+            <div>${onlineBadge}</div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 py-3">
+            <div class="p-3 rounded-2xl bg-[#080c14] border border-white/10">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Mountain Stage</div>
+                <div class="text-xl font-black text-amber-300 mt-0.5">Stage ${currentLevel} <span class="text-xs text-slate-500">/ 21</span></div>
+                <div class="text-[10px] text-slate-400 font-mono mt-1">${levelPct}% Completed</div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-[#080c14] border border-white/10">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Total XP Earned</div>
+                <div class="text-xl font-black text-purple-300 mt-0.5">${(Number(user.xp) || 0).toLocaleString()} <span class="text-xs text-slate-500">XP</span></div>
+                <div class="text-[10px] text-emerald-400 font-semibold mt-1">🏆 Trail Mastery</div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-[#080c14] border border-white/10">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Platform / Device</div>
+                <div class="text-sm font-bold text-slate-200 mt-1 truncate">${escapeHtml(user.device || 'Android APK')}</div>
+                <div class="text-[10px] text-slate-500 mt-1">Client Hardware</div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-[#080c14] border border-white/10">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Last Recorded Action</div>
+                <div class="text-sm font-mono font-bold text-emerald-400 mt-1 truncate">${escapeHtml(user.lastAction || 'login')}</div>
+                <div class="text-[10px] text-slate-500 mt-1">Live Telemetry</div>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3.5 py-4">
-            <div class="p-4 rounded-2xl bg-[#080c14] border border-white/10 space-y-2">
-                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Mountain Trail Progress</div>
-                <div class="text-2xl font-black text-amber-300">Stage ${currentLevel} <span class="text-xs text-slate-400 font-normal">/ 21</span></div>
-                <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
-                    <div class="h-full bg-gradient-to-r from-emerald-500 to-amber-400" style="width: ${levelPct}%"></div>
-                </div>
-                <div class="text-[10px] text-slate-500 font-mono">${levelPct}% Course Completed</div>
+        <div class="space-y-2 py-2">
+            <div class="flex items-center justify-between">
+                <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🏔️</span>
+                    <span>Mountain Trail 21-Stage Curriculum Breakdown</span>
+                </h4>
+                <span class="text-[11px] font-bold text-amber-300">${currentLevel} / 21 Stages Unlocked</span>
             </div>
-
-            <div class="p-4 rounded-2xl bg-[#080c14] border border-white/10 space-y-2">
-                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Total XP Earned</div>
-                <div class="text-2xl font-black text-purple-300">${(Number(user.xp) || 0).toLocaleString()} <span class="text-xs text-slate-400 font-normal">XP</span></div>
-                <div class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                    <span>🏆</span> Trail Mastery Level
-                </div>
-                <div class="text-[10px] text-slate-500 font-mono">Rank: Trail Explorer</div>
+            <div class="w-full h-1.5 bg-[#080c14] rounded-full overflow-hidden border border-white/10 mb-2">
+                <div class="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 rounded-full" style="width: ${levelPct}%"></div>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+                ${stagesHtml}
             </div>
         </div>
 
-        <div class="p-4 rounded-2xl bg-[#080c14] border border-white/5 space-y-2.5">
-            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Device & Telemetry Details</h4>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                    <span class="text-slate-500 block text-[10px] uppercase font-bold">Client Environment</span>
-                    <span class="text-slate-200 font-medium">${escapeHtml(user.device || 'Android APK')}</span>
-                </div>
-                <div>
-                    <span class="text-slate-500 block text-[10px] uppercase font-bold">Last Action</span>
-                    <span class="text-emerald-400 font-mono font-bold">${escapeHtml(user.lastAction || 'login')}</span>
-                </div>
-                <div>
-                    <span class="text-slate-500 block text-[10px] uppercase font-bold">Authentication</span>
-                    <span class="text-slate-200 font-mono">${escapeHtml(user.provider || 'cloud')}</span>
-                </div>
-                <div>
-                    <span class="text-slate-500 block text-[10px] uppercase font-bold">Account ID</span>
-                    <span class="text-slate-400 font-mono text-[10px]">${escapeHtml(user.userId || 'local_user')}</span>
-                </div>
+        <div class="space-y-2 pt-2 border-t border-white/10">
+            <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                <span>📋</span>
+                <span>Learner Activity & Login Audit Stream</span>
+            </h4>
+            <div class="max-h-40 overflow-y-auto pr-1">
+                ${logsHtml}
             </div>
         </div>
     `;

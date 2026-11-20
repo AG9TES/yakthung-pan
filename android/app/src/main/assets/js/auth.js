@@ -836,32 +836,53 @@ function applySignedInUser(profile) {
 async function restoreCloudProgress(accountIdentifier) {
     if (!accountIdentifier) return;
     const cleanId = String(accountIdentifier).toLowerCase().trim();
-    const cloudKey = getAccountCloudKey(cleanId);
     const userDocId = cleanId.replace(/[^a-z0-9]/g, '_');
+    const cloudKey = 'u_' + userDocId;
     console.log('[Cloud Progress] Restoring progress for:', cleanId, 'DocID:', userDocId);
 
-    let cloudData = null;
+    let remoteCloudData = null;
 
-    // 1. Primary: Query Google Firebase Firestore (Permanent Cloud DB)
+    // 1. Primary: Query Cloud Progress Hub (Universal REST key-value engine across all devices)
+    try {
+        const res = await fetch(CLOUD_PROGRESS_URL, { cache: 'no-store' });
+        if (res.ok) {
+            const json = await res.json();
+            const hubData = json.data || {};
+            const users = hubData.users || {};
+            
+            // Match user by multiple normalized keys or email
+            let found = users[cloudKey] || users[cleanId] || users[userDocId];
+            if (!found) {
+                for (const [k, u] of Object.entries(users)) {
+                    if (u && (
+                        (u.email && u.email.toLowerCase().trim() === cleanId) ||
+                        k.toLowerCase() === cloudKey.toLowerCase() ||
+                        k.toLowerCase().includes(userDocId)
+                    )) {
+                        found = u;
+                        break;
+                    }
+                }
+            }
+            if (found && (Number(found.unlockedLevel) > 1 || Number(found.xp) > 0 || (found.levelStars && Object.keys(found.levelStars).length > 0))) {
+                remoteCloudData = found;
+                console.log('[Cloud Progress] Found progress in Cloud Hub:', remoteCloudData);
+            }
+        }
+    } catch (e) {
+        console.warn('[Cloud Progress] Cloud Hub fetch note:', e);
+    }
+
+    // 2. Secondary: Query Google Firebase Firestore
+    let firestoreData = null;
     if (firestoreDb) {
         try {
-            // Check doc by sanitized email/id
             const docRef = firestoreDb.collection('user_progress').doc(userDocId);
             const snap = await docRef.get();
             if (snap.exists) {
                 const data = snap.data();
                 if (data && (Number(data.unlockedLevel) > 1 || Number(data.xp) > 0 || (data.levelStars && Object.keys(data.levelStars).length > 0))) {
-                    cloudData = data;
-                    console.log('[Cloud Progress] Found existing progress in Firestore:', data);
-                }
-            } else if (currentUser && currentUser.id && currentUser.id !== userDocId) {
-                const altRef = firestoreDb.collection('user_progress').doc(currentUser.id);
-                const altSnap = await altRef.get();
-                if (altSnap.exists) {
-                    const data = altSnap.data();
-                    if (data && (Number(data.unlockedLevel) > 1 || Number(data.xp) > 0 || (data.levelStars && Object.keys(data.levelStars).length > 0))) {
-                        cloudData = data;
-                    }
+                    firestoreData = data;
                 }
             }
         } catch (err) {
@@ -869,52 +890,54 @@ async function restoreCloudProgress(accountIdentifier) {
         }
     }
 
-    // 2. Secondary: Check local user-specific cache (if played on this device before)
-    if (!cloudData) {
-        try {
-            const userStorageKey = (typeof getProgressStorageKey === 'function') ? getProgressStorageKey() : `yakthung_progress_user_${userDocId}`;
-            const localSaved = localStorage.getItem(userStorageKey);
-            if (localSaved) {
-                const parsed = JSON.parse(localSaved);
-                if (parsed && (Number(parsed.unlockedLevel) > 1 || Number(parsed.xp) > 0 || (parsed.levelStars && Object.keys(parsed.levelStars).length > 0))) {
-                    cloudData = parsed;
-                }
+    // 3. Local Cache on this device
+    let localData = null;
+    try {
+        const userStorageKey = (typeof getProgressStorageKey === 'function') ? getProgressStorageKey() : `yakthung_progress_user_${userDocId}`;
+        const localSaved = localStorage.getItem(userStorageKey);
+        if (localSaved) {
+            const parsed = JSON.parse(localSaved);
+            if (parsed && (Number(parsed.unlockedLevel) > 1 || Number(parsed.xp) > 0 || (parsed.levelStars && Object.keys(parsed.levelStars).length > 0))) {
+                localData = parsed;
             }
-        } catch (e) {}
+        }
+    } catch (e) {}
+
+    // 4. Resolve highest progress across remote Cloud Hub, Firestore, and Local
+    let cloudData = null;
+    const candidates = [remoteCloudData, firestoreData, localData].filter(Boolean);
+    if (candidates.length > 0) {
+        cloudData = {
+            unlockedLevel: 1,
+            xp: 0,
+            streak: 1,
+            levelStars: {},
+            masteredChars: [],
+            email: cleanId
+        };
+        for (const c of candidates) {
+            cloudData.unlockedLevel = Math.max(cloudData.unlockedLevel, Number(c.unlockedLevel || c.level) || 1);
+            cloudData.xp = Math.max(cloudData.xp, Number(c.xp) || 0);
+            cloudData.streak = Math.max(cloudData.streak, Number(c.streak) || 1);
+            if (c.levelStars && typeof c.levelStars === 'object') {
+                cloudData.levelStars = { ...cloudData.levelStars, ...c.levelStars };
+            }
+            if (Array.isArray(c.masteredChars)) {
+                cloudData.masteredChars = Array.from(new Set([...cloudData.masteredChars, ...c.masteredChars]));
+            }
+        }
     }
 
-    // 3. Fallback: Check Cloud Progress Hub
-    if (!cloudData) {
-        try {
-            const res = await fetch(CLOUD_PROGRESS_URL, { cache: 'no-store' });
-            if (res.ok) {
-                const json = await res.json();
-                const hubData = json.data || {};
-                const users = hubData.users || {};
-                let foundCloud = users[cloudKey] || users[cleanId] || users[userDocId];
-                if (!foundCloud) {
-                    for (const u of Object.values(users)) {
-                        if (u && u.email && u.email.toLowerCase().trim() === cleanId) {
-                            foundCloud = u;
-                            break;
-                        }
-                    }
-                }
-                if (foundCloud && (Number(foundCloud.unlockedLevel) > 1 || Number(foundCloud.xp) > 0)) {
-                    cloudData = foundCloud;
-                }
-            }
-        } catch (e) {}
-    }
-
-    // 4. Decision: Returning User vs Brand New User
-    if (cloudData) {
+    // 5. Decision: Returning User vs Brand New User
+    if (cloudData && (cloudData.unlockedLevel > 1 || cloudData.xp > 0 || Object.keys(cloudData.levelStars).length > 0)) {
         // Returning User: Restore exact progress!
-        console.log('[Cloud Progress] Restoring progress for returning user:', cloudData);
+        console.log('[Cloud Progress] Restoring progress for returning user across devices:', cloudData);
         mergeProgress(cloudData);
         if (typeof showToast === 'function') {
             showToast(`Welcome back! Progress restored to Level ${progress.unlockedLevel} (${progress.xp} XP)`, '☁️');
         }
+        // Ensure merged state is written back to Cloud Hub
+        syncCloudProgress(false);
     } else {
         // Brand New User: Must start fresh as NEW!
         console.log('[Cloud Progress] Brand new user. Initializing clean Level 1 start.');
@@ -940,7 +963,7 @@ async function restoreCloudProgress(accountIdentifier) {
         if (typeof renderWindingMap === 'function') renderWindingMap(1);
         if (typeof updateWelcomeScreenUI === 'function') updateWelcomeScreenUI();
 
-        // Broadcast signup activity to Admin Dashboard
+        // Broadcast signup activity to Admin Dashboard & Cloud Hub
         if (typeof recordAdminActivity === 'function') {
             recordAdminActivity('signup', {
                 userId: (currentUser && currentUser.id) || userDocId,
@@ -949,11 +972,24 @@ async function restoreCloudProgress(accountIdentifier) {
                 provider: (currentUser && currentUser.provider) || 'google',
                 level: 1,
                 xp: 0,
-                details: 'New learner account initialized • Level 1'
+                details: 'New learner registered • Level 1'
             });
         }
 
-        // Create initial clean record in Firestore
+        // Initialize clean record in Cloud Progress Hub
+        saveProgressToCloudHub(cloudKey, {
+            unlockedLevel: 1,
+            levelStars: {},
+            xp: 0,
+            streak: 1,
+            masteredChars: [],
+            email: cleanId,
+            name: (currentUser && (currentUser.name || currentUser.username)) || 'Learner',
+            provider: (currentUser && currentUser.provider) || 'google',
+            syncedAt: new Date().toISOString()
+        });
+
+        // Create initial clean record in Firestore if available
         if (firestoreDb) {
             try {
                 firestoreDb.collection('user_progress').doc(userDocId).set({
@@ -1099,15 +1135,24 @@ async function saveProgressToCloudHub(cloudKey, payload) {
         const hubData = json.data || { users: {} };
         if (!hubData.users) hubData.users = {};
 
-        const existing = hubData.users[cloudKey];
-        if (existing) {
-            payload.unlockedLevel = Math.max(Number(payload.unlockedLevel) || 1, Number(existing.unlockedLevel) || 1);
-            payload.xp = Math.max(Number(payload.xp) || 0, Number(existing.xp) || 0);
-            payload.streak = Math.max(Number(payload.streak) || 1, Number(existing.streak) || 1);
-            payload.levelStars = { ...(existing.levelStars || {}), ...(payload.levelStars || {}) };
-        }
+        const existing = hubData.users[cloudKey] || (payload.email ? hubData.users[payload.email.toLowerCase().trim()] : {}) || {};
+        const mergedPayload = {
+            unlockedLevel: Math.max(Number(payload.unlockedLevel) || 1, Number(existing.unlockedLevel) || 1),
+            xp: Math.max(Number(payload.xp) || 0, Number(existing.xp) || 0),
+            streak: Math.max(Number(payload.streak) || 1, Number(existing.streak) || 1),
+            levelStars: { ...(existing.levelStars || {}), ...(payload.levelStars || {}) },
+            masteredChars: Array.from(new Set([...(existing.masteredChars || []), ...(payload.masteredChars || [])])),
+            email: payload.email || existing.email || '',
+            name: payload.name || existing.name || 'Learner',
+            provider: payload.provider || existing.provider || 'google',
+            syncedAt: new Date().toISOString()
+        };
 
-        hubData.users[cloudKey] = payload;
+        hubData.users[cloudKey] = mergedPayload;
+        if (payload.email) {
+            hubData.users[payload.email.toLowerCase().trim()] = mergedPayload;
+            hubData.users[payload.email.toLowerCase().replace(/[^a-z0-9]/g, '_')] = mergedPayload;
+        }
 
         await fetch(CLOUD_PROGRESS_URL, {
             method: 'PUT',
@@ -1117,7 +1162,7 @@ async function saveProgressToCloudHub(cloudKey, payload) {
                 data: hubData
             })
         });
-        console.log('[Cloud Progress] Backed up to Cloud Hub for:', cloudKey, 'Level:', payload.unlockedLevel);
+        console.log('[Cloud Progress] Backed up to Cloud Hub for:', cloudKey, 'Level:', mergedPayload.unlockedLevel, 'XP:', mergedPayload.xp);
     } catch (e) {
         console.warn('[Cloud Progress] Cloud Hub save notice:', e);
     }
