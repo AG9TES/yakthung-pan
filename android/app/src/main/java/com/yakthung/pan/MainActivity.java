@@ -29,6 +29,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.OnCompleteListener;
+import androidx.annotation.NonNull;
 
 public class MainActivity extends AppCompatActivity {
     private WebView webView;
@@ -44,9 +46,17 @@ public class MainActivity extends AppCompatActivity {
                 public void run() {
                     try {
                         if (mGoogleSignInClient != null) {
-                            mGoogleSignInClient.signOut();
-                            Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-                            startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
+                            mGoogleSignInClient.signOut().addOnCompleteListener(MainActivity.this, new OnCompleteListener<Void>() {
+                                @Override
+                                public void onComplete(@NonNull Task<Void> task) {
+                                    try {
+                                        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+                                        startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
+                                    } catch (Exception e) {
+                                        Log.e("YakthungPan", "Native Google Sign-In intent error: " + e.getMessage(), e);
+                                    }
+                                }
+                            });
                         }
                     } catch (Exception e) {
                         Log.e("YakthungPan", "Native Google Sign-In intent error: " + e.getMessage(), e);

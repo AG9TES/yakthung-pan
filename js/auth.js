@@ -178,16 +178,18 @@ async function handleFirebaseAuthStateChanged(user) {
             switchUserProgress(profile);
         }
 
-        await restoreCloudProgress(user.email || user.uid);
-        updateAuthHUD();
-        updateAuthUI();
-
-        // Dismiss auth modal and welcome screen on successful login
+        // Dismiss auth modal and welcome screen immediately on successful login
         const modal = document.getElementById('authModal');
         if (modal) modal.classList.add('hidden');
         if (typeof dismissWelcomeScreen === 'function') {
             dismissWelcomeScreen();
         }
+
+        updateAuthHUD();
+        updateAuthUI();
+
+        // Restore cloud progress asynchronously in background
+        restoreCloudProgress(user.email || user.uid);
 
         // Record telemetry for Admin Dashboard
         if (typeof recordAdminActivity === 'function') {
@@ -420,17 +422,20 @@ function onNativeGoogleSignInError(statusCode) {
     if (statusCode === 12501) {
         // User cancelled the account picker sheet
         if (typeof showToast === 'function') showToast('Google sign-in cancelled', 'ℹ️');
-    } else if (statusCode === 10 || statusCode === 12500) {
-        // DEVELOPER_ERROR (e.g. SHA-1 fingerprint needs to be in Firebase Console)
+        return;
+    }
+    if (statusCode === 12502) {
+        // Sign-in currently in progress
+        return;
+    }
+    if (statusCode === 10 || statusCode === 12500) {
         if (typeof showToast === 'function') {
-            showToast('Note: Add SHA-1 in Firebase Console for this app.', '⚠️');
+            showToast('Google account authentication note (Code ' + statusCode + ')', 'ℹ️');
         }
-        signInWithGoogleFirebase();
-    } else {
-        if (typeof showToast === 'function') {
-            showToast(`Google Sign-In notice (${statusCode})`, 'ℹ️');
-        }
-        signInWithGoogleFirebase();
+        return;
+    }
+    if (typeof showToast === 'function') {
+        showToast(`Google Sign-In notice (${statusCode})`, 'ℹ️');
     }
 }
 if (typeof window !== 'undefined') {
@@ -934,6 +939,19 @@ async function restoreCloudProgress(accountIdentifier) {
         if (typeof updateHudDisplay === 'function') updateHudDisplay();
         if (typeof renderWindingMap === 'function') renderWindingMap(1);
         if (typeof updateWelcomeScreenUI === 'function') updateWelcomeScreenUI();
+
+        // Broadcast signup activity to Admin Dashboard
+        if (typeof recordAdminActivity === 'function') {
+            recordAdminActivity('signup', {
+                userId: (currentUser && currentUser.id) || userDocId,
+                userName: (currentUser && (currentUser.name || currentUser.username)) || 'Learner',
+                email: cleanId,
+                provider: (currentUser && currentUser.provider) || 'google',
+                level: 1,
+                xp: 0,
+                details: 'New learner account initialized • Level 1'
+            });
+        }
 
         // Create initial clean record in Firestore
         if (firestoreDb) {
@@ -1457,7 +1475,8 @@ function recordAdminActivity(action, details = {}) {
             device: details.device || getDeviceSummary(),
             level: details.level || (typeof progress !== 'undefined' ? (progress.unlockedLevel || 1) : 1),
             xp: details.xp || (typeof progress !== 'undefined' ? (progress.xp || 0) : 0),
-            status: details.status || 'success'
+            status: details.status || 'success',
+            details: details.details || ''
         };
 
         // 1. Save to local storage for instant offline & client-side dashboard
@@ -1500,14 +1519,15 @@ function recordAdminActivity(action, details = {}) {
         }
 
         // 3. Save to Firebase Firestore if online
-        if (firestoreDb && !entry.userId.startsWith('demo_')) {
+        const db = firestoreDb || (window.firebase && typeof window.firebase.firestore === 'function' ? window.firebase.firestore() : null);
+        if (db && !entry.userId.startsWith('demo_')) {
             try {
-                firestoreDb.collection('admin_activity_logs').add({
+                db.collection('admin_activity_logs').add({
                     ...entry,
                     serverTimestamp: window.firebase && window.firebase.firestore ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
                 }).catch(() => {});
 
-                firestoreDb.collection('users').doc(entry.userId).set({
+                db.collection('users').doc(entry.userId).set({
                     id: entry.userId,
                     name: entry.userName,
                     email: entry.email,

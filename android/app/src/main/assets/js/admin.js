@@ -16,7 +16,7 @@ var ADMIN_STORAGE_PASSCODE = 'yakthung_admin_passcode';
 var ADMIN_STORAGE_EMAILS = 'yakthung_admin_emails';
 var ADMIN_STORAGE_SOUND = 'yakthung_admin_sound_enabled';
 var DEFAULT_ADMIN_PASSCODE = 'yakthung2026';
-var DEFAULT_ADMIN_EMAILS = ['admin@yakthung.com', 'ag9tes@gmail.com'];
+var DEFAULT_ADMIN_EMAILS = ['admin@yakthung.com', 'ag9tes@gmail.com', 'ag9tes.yt@gmail.com'];
 
 var currentAdminTab = 'logs';
 var cachedLogs = [];
@@ -34,6 +34,7 @@ var logsUnsubscribe = null;
 var usersUnsubscribe = null;
 var realtimeBroadcastChannel = null;
 var liveTimeTicker = null;
+var localRefreshTimer = null;
 var newEventIds = new Set();
 
 // =====================================================================
@@ -205,12 +206,21 @@ function initRealtimeEngine() {
     if (!liveTimeTicker) {
         liveTimeTicker = setInterval(updateAllTimeAgoStrings, 10000);
     }
+
+    // 8. Periodic Live Local Refresh (Every 3 seconds failsafe for instant app link)
+    if (!localRefreshTimer) {
+        localRefreshTimer = setInterval(syncLatestLocalTelemetry, 3000);
+    }
 }
 
 function teardownRealtimeListeners() {
     if (cloudHubPollTimer) {
         clearInterval(cloudHubPollTimer);
         cloudHubPollTimer = null;
+    }
+    if (localRefreshTimer) {
+        clearInterval(localRefreshTimer);
+        localRefreshTimer = null;
     }
     if (logsUnsubscribe) {
         try { logsUnsubscribe(); } catch (e) {}
@@ -391,16 +401,15 @@ function setupBroadcastChannelRealtime() {
 }
 
 function handleStorageEvent(event) {
-    if (event.key === 'yakthung_admin_logs') {
-        try {
-            const fresh = JSON.parse(event.newValue || '[]');
-            if (fresh.length > 0) {
-                mergeLogsIntoCache(fresh);
-                updateKPICards();
-                renderCurrentTab();
-            }
-        } catch (e) {}
+    if (!event || !event.key) return;
+    const k = event.key;
+    if (k === 'yakthung_admin_logs' || k === 'yakthung_admin_learners' || k === 'yakthung_local_accounts' || k === 'yakthung_auth_profile' || k.startsWith('yakthung_progress_')) {
+        syncLatestLocalTelemetry();
     }
+}
+
+function syncLatestLocalTelemetry() {
+    loadInitialBaselineData(false);
 }
 
 /**
@@ -442,8 +451,18 @@ function handleIncomingRealtimeEntry(entry, animate = true) {
     }
 
     // Live Toast notification
-    const actionLabel = (entry.action === 'signup' ? 'Registered' : (entry.action === 'sync' ? 'Synced Progress' : 'Logged In'));
-    const badgeIcon = (entry.action === 'signup' ? '✨' : (entry.action === 'sync' ? '☁️' : '🔑'));
+    let actionLabel = 'Logged In';
+    let badgeIcon = '🔑';
+    if (entry.action === 'signup') {
+        actionLabel = 'Registered';
+        badgeIcon = '✨';
+    } else if (entry.action === 'level_complete') {
+        actionLabel = `Completed Level ${entry.level || ''}`;
+        badgeIcon = '🏆';
+    } else if (entry.action === 'sync') {
+        actionLabel = `Synced Progress (Lv.${entry.level || 1})`;
+        badgeIcon = '☁️';
+    }
     showAdminToast(`${badgeIcon} Live: ${entry.userName || 'Learner'} ${actionLabel}!`, badgeIcon);
 
     // Update KPIs instantly
@@ -724,7 +743,7 @@ async function pushToCloudHubDirect(entry) {
 // 3. BASELINE LOCAL DATA LOADING
 // =====================================================================
 
-function loadInitialBaselineData() {
+function loadInitialBaselineData(allowSampleFallback = true) {
     let localLogs = [];
     try {
         localLogs = JSON.parse(localStorage.getItem('yakthung_admin_logs') || '[]');
@@ -735,28 +754,130 @@ function loadInitialBaselineData() {
         localLearnersMap = JSON.parse(localStorage.getItem('yakthung_admin_learners') || '{}');
     } catch (e) {}
 
-    let localAccounts = {};
+    // 1. Ingest registered accounts from yakthung_local_accounts
     try {
-        localAccounts = JSON.parse(localStorage.getItem('yakthung_local_accounts') || '{}');
+        const localAccounts = JSON.parse(localStorage.getItem('yakthung_local_accounts') || '{}');
         Object.values(localAccounts).forEach(acc => {
-            const key = acc.email ? acc.email.toLowerCase() : acc.id;
-            if (!localLearnersMap[key]) {
-                localLearnersMap[key] = {
-                    userId: acc.id,
-                    userName: acc.username || acc.name,
-                    email: acc.email,
-                    provider: 'email',
-                    lastActive: acc.created || new Date().toISOString(),
-                    lastAction: 'signup',
-                    level: 1,
-                    xp: 0,
-                    device: 'Local Account'
-                };
+            const key = (acc.email || acc.id || '').toLowerCase().trim();
+            if (key) {
+                if (!localLearnersMap[key]) {
+                    localLearnersMap[key] = {
+                        userId: acc.id || key,
+                        userName: acc.username || acc.name || 'Learner',
+                        email: acc.email || '',
+                        provider: acc.provider || 'email',
+                        lastActive: acc.created || new Date().toISOString(),
+                        lastAction: 'signup',
+                        level: 1,
+                        xp: 0,
+                        device: 'Registered Account'
+                    };
+                }
             }
         });
     } catch (e) {}
 
-    if (localLogs.length === 0) {
+    // 2. Ingest active user profile from yakthung_auth_profile
+    try {
+        const authRaw = localStorage.getItem('yakthung_auth_profile');
+        if (authRaw) {
+            const u = JSON.parse(authRaw);
+            const key = (u.email || u.id || '').toLowerCase().trim();
+            if (key) {
+                if (!localLearnersMap[key]) {
+                    localLearnersMap[key] = {
+                        userId: u.id || key,
+                        userName: u.name || u.username || 'Active Learner',
+                        email: u.email || '',
+                        provider: u.provider || 'google',
+                        lastActive: u.lastSynced || new Date().toISOString(),
+                        lastAction: 'login',
+                        level: 1,
+                        xp: 0,
+                        device: 'Active Session'
+                    };
+                } else {
+                    localLearnersMap[key].userName = u.name || u.username || localLearnersMap[key].userName;
+                    localLearnersMap[key].provider = u.provider || localLearnersMap[key].provider;
+                }
+            }
+        }
+    } catch (e) {}
+
+    // 3. Scan all user progress keys (yakthung_progress_user_*) and guest progress
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('yakthung_progress_user_')) {
+                const cleanId = k.replace('yakthung_progress_user_', '');
+                const pRaw = localStorage.getItem(k);
+                if (pRaw) {
+                    const p = JSON.parse(pRaw);
+                    const lvl = Number(p.unlockedLevel) || 1;
+                    const xp = Number(p.xp) || 0;
+
+                    // Match to an existing learner
+                    let matched = false;
+                    for (const [lKey, lVal] of Object.entries(localLearnersMap)) {
+                        const cleanKey = lKey.replace(/[^a-z0-9]/g, '_');
+                        if (cleanKey === cleanId || cleanId.includes(cleanKey) || cleanKey.includes(cleanId)) {
+                            lVal.level = Math.max(Number(lVal.level) || 1, lvl);
+                            lVal.xp = Math.max(Number(lVal.xp) || 0, xp);
+                            if (p.lastActiveDate) lVal.lastActive = p.lastActiveDate;
+                            matched = true;
+                            break;
+                        }
+                    }
+
+                    if (!matched) {
+                        const guessedEmail = cleanId.includes('gmail')
+                            ? cleanId.replace(/_at_/g, '@').replace(/_dot_/g, '.').replace(/_/g, '.')
+                            : '';
+                        const formattedName = cleanId.replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        localLearnersMap[cleanId] = {
+                            userId: cleanId,
+                            userName: formattedName,
+                            email: guessedEmail,
+                            provider: 'google',
+                            lastActive: p.lastActiveDate || new Date().toISOString(),
+                            lastAction: 'progress',
+                            level: lvl,
+                            xp: xp,
+                            device: 'Learner App'
+                        };
+                    }
+                }
+            }
+        }
+    } catch (e) {}
+
+    // Save consolidated learners roster
+    try {
+        localStorage.setItem('yakthung_admin_learners', JSON.stringify(localLearnersMap));
+    } catch (e) {}
+
+    // 4. Activity Logs reconciliation:
+    // If real learners exist and localLogs is empty, generate real baseline logs from these actual learners
+    const realLearnerList = Object.values(localLearnersMap);
+    if (localLogs.length === 0 && realLearnerList.length > 0) {
+        realLearnerList.forEach((lrn, idx) => {
+            localLogs.push({
+                id: 'act_init_' + (idx + 1),
+                action: lrn.lastAction || 'login',
+                userId: lrn.userId,
+                userName: lrn.userName,
+                email: lrn.email,
+                provider: lrn.provider,
+                timestamp: lrn.lastActive || new Date().toISOString(),
+                device: lrn.device || 'Learner App',
+                level: lrn.level || 1,
+                xp: lrn.xp || 0,
+                status: 'success',
+                details: `Learner on Level ${lrn.level || 1} • ${lrn.xp || 0} XP`
+            });
+        });
+        try { localStorage.setItem('yakthung_admin_logs', JSON.stringify(localLogs)); } catch (e) {}
+    } else if (localLogs.length === 0 && allowSampleFallback) {
         localLogs = generateInitialSampleLogs();
         try { localStorage.setItem('yakthung_admin_logs', JSON.stringify(localLogs)); } catch (e) {}
     }
@@ -1434,6 +1555,10 @@ function getActionBadge(action) {
             return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 text-[11px] font-bold">🔑 Login</span>';
         case 'signup':
             return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/25 text-[11px] font-bold">✨ Sign Up</span>';
+        case 'level_complete':
+            return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">🏆 Level Done</span>';
+        case 'app_launch':
+            return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/25 text-[11px] font-bold">🚀 App Launch</span>';
         case 'sync':
             return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/25 text-[11px] font-bold">☁️ Cloud Sync</span>';
         case 'reset_pwd':
