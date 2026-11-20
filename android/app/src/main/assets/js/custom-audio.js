@@ -563,15 +563,16 @@ function getAllCurriculumItemsForStudio() {
         });
     }
 
-    // 3b. Chuk-sak 7 Finals
+    // 3b. Chuk-sak 8 Finals
     const chukItems = [
-        { id: 'chuk_k', char: 'ᤁᤰ', latin: 'Final -k (ᤁᤰ)', deva: '-क् (-k)', meaning: 'Kem-sak Ka (ᤰ)', type: 'extras', groupLabel: 'Chuk-sak 7 Finals' },
-        { id: 'chuk_ng', char: 'ᤁᤱ', latin: 'Final -ng (ᤁᤱ)', deva: '-ङ् (-ng)', meaning: 'Kem-sak Nga (ᤱ)', type: 'extras', groupLabel: 'Chuk-sak 7 Finals' },
-        { id: 'chuk_t', char: 'ᤁᤳ', latin: 'Final -t (ᤁᤳ)', deva: '-त् (-t)', meaning: 'Kem-sak Ta (ᤳ)', type: 'extras', groupLabel: 'Chuk-sak 7 Finals' },
-        { id: 'chuk_p', char: 'ᤁᤵ', latin: 'Final -p (ᤁᤵ)', deva: '-प् (-p)', meaning: 'Kem-sak Pa (ᤵ)', type: 'extras', groupLabel: 'Chuk-sak 7 Finals' },
-        { id: 'chuk_m', char: 'ᤁᤶ', latin: 'Final -m (ᤁᤶ)', deva: '-म् (-m)', meaning: 'Kem-sak Ma (ᤶ)', type: 'extras', groupLabel: 'Chuk-sak 7 Finals' },
-        { id: 'chuk_r', char: 'ᤁᤷ', latin: 'Final -r (ᤁᤷ)', deva: '-र् (-r)', meaning: 'Kem-sak Ra (ᤷ)', type: 'extras', groupLabel: 'Chuk-sak 7 Finals' },
-        { id: 'chuk_l', char: 'ᤁᤸ', latin: 'Final -l (ᤁᤸ)', deva: '-ल् (-l)', meaning: 'Kem-sak La (ᤸ)', type: 'extras', groupLabel: 'Chuk-sak 7 Finals' }
+        { id: 'chuk_k', char: 'ᤁᤰ', latin: 'Final -k (ᤁᤰ)', deva: '-क् (-k)', meaning: 'Kem-sak Ka (ᤰ)', type: 'extras', groupLabel: 'Chuk-sak 8 Finals' },
+        { id: 'chuk_ng', char: 'ᤁᤱ', latin: 'Final -ng (ᤁᤱ)', deva: '-ङ् (-ng)', meaning: 'Kem-sak Nga (ᤱ)', type: 'extras', groupLabel: 'Chuk-sak 8 Finals' },
+        { id: 'chuk_t', char: 'ᤁᤳ', latin: 'Final -t (ᤁᤳ)', deva: '-त् (-t)', meaning: 'Kem-sak Ta (ᤳ)', type: 'extras', groupLabel: 'Chuk-sak 8 Finals' },
+        { id: 'chuk_n', char: 'ᤁᤴ', latin: 'Final -n (ᤁᤴ)', deva: '-न् (-n)', meaning: 'Kem-sak Na (ᤴ)', type: 'extras', groupLabel: 'Chuk-sak 8 Finals' },
+        { id: 'chuk_p', char: 'ᤁᤵ', latin: 'Final -p (ᤁᤵ)', deva: '-प् (-p)', meaning: 'Kem-sak Pa (ᤵ)', type: 'extras', groupLabel: 'Chuk-sak 8 Finals' },
+        { id: 'chuk_m', char: 'ᤁᤶ', latin: 'Final -m (ᤁᤶ)', deva: '-म् (-m)', meaning: 'Kem-sak Ma (ᤶ)', type: 'extras', groupLabel: 'Chuk-sak 8 Finals' },
+        { id: 'chuk_r', char: 'ᤁᤷ', latin: 'Final -r (ᤁᤷ)', deva: '-र् (-r)', meaning: 'Kem-sak Ra (ᤷ)', type: 'extras', groupLabel: 'Chuk-sak 8 Finals' },
+        { id: 'chuk_l', char: 'ᤁᤸ', latin: 'Final -l (ᤁᤸ)', deva: '-ल् (-l)', meaning: 'Kem-sak La (ᤸ)', type: 'extras', groupLabel: 'Chuk-sak 8 Finals' }
     ];
     chukItems.forEach(ci => items.push(ci));
 

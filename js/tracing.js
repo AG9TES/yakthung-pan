@@ -102,6 +102,14 @@ const CHUK_SVG_PATHS = {
         "height": 163,
         "d": "M23 163 0 139Q12 122 31.5 98.5Q51 75 78.0 52.5Q105 30 139.5 15.0Q174 0 216 0Q264 0 303.5 21.0Q343 42 368 84L305 148Q288 107 258.5 90.0Q229 73 191 73Q130 73 89.0 102.0Q48 131 23 163Z"
     },
+    "c_n": {
+        "id": "c_n",
+        "name": "Chuk-n",
+        "deva": "\u0928\u094d",
+        "width": 487,
+        "height": 375,
+        "d": "M309 375Q235 375 185.0 354.0Q135 333 104.0 300.0Q73 267 55.5 228.0Q38 189 29.0 152.0Q20 115 14.5 87.0Q9 59 0 48L26 0Q43 26 53.5 62.0Q64 98 76.5 137.5Q89 177 110.5 212.0Q132 247 169.0 271.5Q206 296 267 302Q246 268 246 229Q246 184 278.0 151.0Q310 118 371 118Q419 118 453.0 149.0Q487 180 487 233Q487 280 463.0 311.5Q439 343 399.0 359.0Q359 375 309 375ZM359 292Q385 292 404.0 273.5Q423 255 423 229Q423 203 404.0 184.5Q385 166 359 166Q333 166 314.5 184.5Q296 203 296 229Q296 255 314.5 273.5Q333 292 359 292Z"
+    },
     "c_p": {
         "id": "c_p",
         "name": "Chuk-p",
@@ -626,7 +634,7 @@ function loadCurrentTraceCard() {
     const hintEl = document.getElementById('cardPhoneticHint');
     if (hintEl) {
         if (isChuk) {
-            hintEl.textContent = `Chuk-sak • 7 Half Letters (${letter.matraName || letter.latin})`;
+            hintEl.textContent = `Chuk-sak • 8 Half Letters (${letter.matraName || letter.latin})`;
         } else if (letter.nepaliMatra) {
             hintEl.textContent = `Saknam • 8 Matras (${letter.matraName || letter.latin})`;
         } else {

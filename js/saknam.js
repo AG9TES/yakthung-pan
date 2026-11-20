@@ -1,6 +1,6 @@
 /**
  * Yakthung Pan • Saknam-sak Matras & Marks Engine (Mode D)
- * Interactive builder for 8 Matras, 7 Chuk-sak finals, Conjuncts, and Sound marks.
+ * Interactive builder for 8 Matras, 8 Chuk-sak finals, Conjuncts, and Sound marks.
  */
 
 function initSaknamBuilder(lvl) {
@@ -32,11 +32,13 @@ const CHUK_SAK_7_PAIRS = [
     { id: 'c_k', full: 'ᤁ', half: 'ᤰ', deva: 'क्', fullDeva: 'क', latin: 'k', fontKey: 'Z = ट' },
     { id: 'c_ng', full: 'ᤅ', half: 'ᤱ', deva: 'ङ्', fullDeva: 'ङ', latin: 'ng', fontKey: 'उ° = ०' },
     { id: 'c_t', full: 'ᤋ', half: 'ᤳ', deva: 'त्', fullDeva: 'त', latin: 't', fontKey: '३ = ⌒' },
+    { id: 'c_n', full: 'ᤏ', half: 'ᤴ', deva: 'न्', fullDeva: 'न', latin: 'n', fontKey: 'न = ᤴ' },
     { id: 'c_p', full: 'ᤐ', half: 'ᤵ', deva: 'प्', fullDeva: 'प', latin: 'p', fontKey: 'w = ч' },
     { id: 'c_m', full: 'ᤔ', half: 'ᤶ', deva: 'म्', fullDeva: 'म', latin: 'm', fontKey: 'य = ५' },
     { id: 'c_r', full: 'ᤖ', half: 'ᤷ', deva: 'र्', fullDeva: 'र', latin: 'r', fontKey: 'र = ,' },
     { id: 'c_l', full: 'ᤗ', half: 'ᤸ', deva: 'ल्', fullDeva: 'ल', latin: 'l', fontKey: 'u = प' }
 ];
+const CHUK_SAK_PAIRS = CHUK_SAK_7_PAIRS;
 
 function toggleChukBookChart() {
     const box = document.getElementById('chukBookChartBox');

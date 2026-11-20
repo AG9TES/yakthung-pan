@@ -200,7 +200,7 @@
 
                 const chukCard = document.createElement('div');
                 chukCard.className = 'bg-white rounded-3xl p-3 border border-parchment-300 shadow-sm space-y-2';
-                chukCard.innerHTML = `<div class="text-[11px] font-extrabold text-slatebrand-900">Chuk-sak • 7 Half / Subjoined Final Consonants</div>`;
+                chukCard.innerHTML = `<div class="text-[11px] font-extrabold text-slatebrand-900">Chuk-sak • 8 Half / Subjoined Final Consonants</div>`;
                 const chukGrid = document.createElement('div');
                 chukGrid.className = 'grid grid-cols-4 gap-1.5';
                 CHUK_FINALS.forEach(c => {

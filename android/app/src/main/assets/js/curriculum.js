@@ -849,6 +849,25 @@ let CHUK_7_LETTERS = [
         "freq": 340.0
     },
     {
+        "id": "c_n",
+        "char": "ᤴ",
+        "latin": "Chuk-n",
+        "deva": "न्",
+        "devaBase": "न",
+        "fullLetter": "ᤏ",
+        "fullDeva": "न",
+        "fontKey": "न = ᤴ",
+        "category": "Chuk-sak Half Letter",
+        "nepaliMatra": "न (Na)",
+        "limbuMatra": "ᤴ चुक् (न्) आधा अक्षर",
+        "matraName": "Chuk-n (न्)",
+        "wordLimbu": "ᤐᤠᤴ",
+        "wordLatin": "Pan",
+        "meaning": "ᤏ (न) ➔ ᤴ (न्) आधा अक्षर (e.g. ᤐᤠᤴ = Pan in Yakthung Pan)",
+        "emoji": "✍️",
+        "freq": 350.0
+    },
+    {
         "id": "c_p",
         "char": "ᤵ",
         "latin": "Chuk-p",
@@ -1068,6 +1087,10 @@ let CHUK_FINALS = [
         "sound": "-त् (-t)"
     },
     {
+        "demo": "ᤁᤴ",
+        "sound": "-न् (-n)"
+    },
+    {
         "demo": "ᤁᤵ",
         "sound": "-प् (-p)"
     },
@@ -1124,7 +1147,7 @@ let KUSEK_MARKS = [
 let CHUK_LEVEL_13_1_ITEMS = [
     {
         "id": "chuk_k",
-        "badge": "✨ Chuk-sak 1/7 • Final -k (-क्)",
+        "badge": "✨ Chuk-sak 1/8 • Final -k (-क्)",
         "instruction": "Identify the Subjoined Final -k attached to Ka: ᤁᤰ",
         "targetDeva": "-क् (-k)",
         "targetLatin": "Ka + Final -k (ᤁᤰ)",
@@ -1152,7 +1175,7 @@ let CHUK_LEVEL_13_1_ITEMS = [
     },
     {
         "id": "chuk_ng",
-        "badge": "✨ Chuk-sak 2/7 • Final -ng (-ङ्)",
+        "badge": "✨ Chuk-sak 2/8 • Final -ng (-ङ्)",
         "instruction": "Identify the Subjoined Final -ng attached to Ka: ᤁᤱ",
         "targetDeva": "-ङ् (-ng)",
         "targetLatin": "Ka + Final -ng (ᤁᤱ)",
@@ -1180,7 +1203,7 @@ let CHUK_LEVEL_13_1_ITEMS = [
     },
     {
         "id": "chuk_t",
-        "badge": "✨ Chuk-sak 3/7 • Final -t (-त्)",
+        "badge": "✨ Chuk-sak 3/8 • Final -t (-त्)",
         "instruction": "Identify the Subjoined Final -t attached to Ka: ᤁᤳ",
         "targetDeva": "-त् (-t)",
         "targetLatin": "Ka + Final -t (ᤁᤳ)",
@@ -1207,8 +1230,36 @@ let CHUK_LEVEL_13_1_ITEMS = [
         ]
     },
     {
+        "id": "chuk_n",
+        "badge": "✨ Chuk-sak 4/8 • Final -n (-न्)",
+        "instruction": "Identify the Subjoined Final -n attached to Ka: ᤁᤴ",
+        "targetDeva": "-न् (-n)",
+        "targetLatin": "Ka + Final -n (ᤁᤴ)",
+        "ruleTitle": "Chuk-sak Na (ᤴ) • Final -n",
+        "ruleDesc": "Attaches above/behind consonant as terminal -n (e.g., 'Pan' ᤐᤠᤴ = Language/Word in Yakthung Pan). Sirijonga font key: न = ᤴ.",
+        "answer": "ᤁᤴ",
+        "options": [
+            {
+                "limbu": "ᤁᤴ",
+                "label": "ᤁᤴ (-न् / -n)"
+            },
+            {
+                "limbu": "ᤁᤳ",
+                "label": "ᤁᤳ (-त् / -t)"
+            },
+            {
+                "limbu": "ᤁᤰ",
+                "label": "ᤁᤰ (-क् / -k)"
+            },
+            {
+                "limbu": "ᤁᤱ",
+                "label": "ᤁᤱ (-ङ् / -ng)"
+            }
+        ]
+    },
+    {
         "id": "chuk_p",
-        "badge": "✨ Chuk-sak 4/7 • Final -p (-प्)",
+        "badge": "✨ Chuk-sak 5/8 • Final -p (-प्)",
         "instruction": "Identify the Subjoined Final -p attached to Ka: ᤁᤵ",
         "targetDeva": "-प् (-p)",
         "targetLatin": "Ka + Final -p (ᤁᤵ)",
@@ -1236,7 +1287,7 @@ let CHUK_LEVEL_13_1_ITEMS = [
     },
     {
         "id": "chuk_m",
-        "badge": "✨ Chuk-sak 5/7 • Final -m (-म्)",
+        "badge": "✨ Chuk-sak 6/8 • Final -m (-म्)",
         "instruction": "Identify the Subjoined Final -m attached to Ka: ᤁᤶ",
         "targetDeva": "-म् (-m)",
         "targetLatin": "Ka + Final -m (ᤁᤶ)",
@@ -1264,7 +1315,7 @@ let CHUK_LEVEL_13_1_ITEMS = [
     },
     {
         "id": "chuk_r",
-        "badge": "✨ Chuk-sak 6/7 • Final -r (-र्)",
+        "badge": "✨ Chuk-sak 7/8 • Final -r (-र्)",
         "instruction": "Identify the Subjoined Final -r attached to Ka: ᤁᤷ",
         "targetDeva": "-र् (-r)",
         "targetLatin": "Ka + Final -r (ᤁᤷ)",
@@ -1292,7 +1343,7 @@ let CHUK_LEVEL_13_1_ITEMS = [
     },
     {
         "id": "chuk_l",
-        "badge": "✨ Chuk-sak 7/7 • Final -l (-ल्)",
+        "badge": "✨ Chuk-sak 8/8 • Final -l (-ल्)",
         "instruction": "Identify the Subjoined Final -l attached to Ka: ᤁᤸ",
         "targetDeva": "-ल् (-l)",
         "targetLatin": "Ka + Final -l (ᤁᤸ)",
@@ -1809,6 +1860,39 @@ let CHUK_LEVEL_15_ITEMS = [
             {
                 "limbu": "ᤏᤣᤶ",
                 "label": "Nem (ᤶ = म्)"
+            }
+        ]
+    },
+    {
+        "fullLetter": "ᤏ",
+        "halfLetter": "ᤴ",
+        "devaHalf": "न्",
+        "fullDeva": "न",
+        "latinName": "Chuk-n",
+        "fontKey": "न = ᤴ",
+        "badge": "✨ ᤏ = ᤴ • चुक् (न्) आधा अक्षर",
+        "instruction": "Half-Letter न् (Chuk-n): ᤏ (Na) ➔ ᤴ (न्)",
+        "targetDeva": "पान् (Pan - Word / Language)",
+        "targetLatin": "Pa (ᤐᤠ) + Chuk-n (ᤴ)",
+        "ruleTitle": "ᤏ (Na) ➔ ᤴ (न्) Half-Letter",
+        "ruleDesc": "In Sirijonga script, full letter ᤏ becomes half letter ᤴ (चुक्-साक्). Example: ᤐᤠ (Paa) + ᤴ (-n) = ᤐᤠᤴ (Pan in Yakthung Pan!). Book font key: न = ᤴ.",
+        "answer": "ᤐᤠᤴ",
+        "options": [
+            {
+                "limbu": "ᤐᤠᤴ",
+                "label": "Pan (ᤴ = न्)"
+            },
+            {
+                "limbu": "ᤐᤠᤰ",
+                "label": "Pak (ᤰ = क्)"
+            },
+            {
+                "limbu": "ᤐᤠᤱ",
+                "label": "Pang (ᤱ = ङ्)"
+            },
+            {
+                "limbu": "ᤐᤠᤳ",
+                "label": "Pat (ᤳ = त्)"
             }
         ]
     },
@@ -2611,7 +2695,7 @@ let CHAPTERS = [
     {
         "id": 5,
         "title": "Chapter 5: Saknam-sak, Chuk-sak & Marks",
-        "subtitle": "8 Matras, 7 Finals, Conjuncts & Marks Trial (70%)",
+        "subtitle": "8 Matras, 8 Finals, Conjuncts & Marks Trial (70%)",
         "badgeColor": "bg-rose-700 text-white"
     },
     {
@@ -2904,7 +2988,7 @@ let ADVENTURE_LEVELS = [
         "levelNum": 15,
         "chapter": 5,
         "type": "saknam",
-        "title": "Chuk-sak: 7 Finals",
+        "title": "Chuk-sak: 8 Finals",
         "icon": "ᤁᤰ",
         "items": [
             {
@@ -2985,6 +3069,33 @@ let ADVENTURE_LEVELS = [
                     {
                         "limbu": "ᤏᤣᤶ",
                         "label": "Nem (-m ᤶ)"
+                    }
+                ]
+            },
+            {
+                "badge": "✨ Chuk-sak • Final -n (चुक्-सक् -न्)",
+                "instruction": "Form word \"Pan\" (Word / Language)",
+                "targetDeva": "पान् (Pan - Word / Language)",
+                "targetLatin": "Paa (ᤐᤠ) + Chuk-n (ᤴ)",
+                "ruleTitle": "Paa + Subjoined -n = ᤐᤠᤴ",
+                "ruleDesc": "The core word of \"Yakthung Pan\" (ᤕᤠᤰᤌᤢᤱ ᤐᤠᤴ), meaning language or speech.",
+                "answer": "ᤐᤠᤴ",
+                "options": [
+                    {
+                        "limbu": "ᤐᤠᤴ",
+                        "label": "Pan (-n ᤴ)"
+                    },
+                    {
+                        "limbu": "ᤐᤠᤳ",
+                        "label": "Pat (-t ᤳ)"
+                    },
+                    {
+                        "limbu": "ᤐᤠᤰ",
+                        "label": "Pak (-k ᤰ)"
+                    },
+                    {
+                        "limbu": "ᤐᤠᤶ",
+                        "label": "Pam (-m ᤶ)"
                     }
                 ]
             },
@@ -3656,9 +3767,9 @@ function applyCurriculumData(data) {
     ADVENTURE_LEVELS.forEach(lvl => {
         if (lvl.levelNum === 15) {
             lvl.type = 'trace';
-            lvl.title = 'Chuk-sak: 7 Half Letters (चुक्-साक् - आधा अक्षर)';
+            lvl.title = 'Chuk-sak: 8 Half Letters (चुक्-साक् - आधा अक्षर)';
             lvl.icon = 'ᤰ';
-            lvl.letterIds = ['c_k', 'c_ng', 'c_t', 'c_p', 'c_m', 'c_r', 'c_l'];
+            lvl.letterIds = ['c_k', 'c_ng', 'c_t', 'c_n', 'c_p', 'c_m', 'c_r', 'c_l'];
         }
         if (lvl.type === 'saknam' && (!lvl.items || lvl.items.length === 0)) {
             if (lvl.levelNum === 14) lvl.items = SAKNAM_LEVEL_14_ITEMS;
