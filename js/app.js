@@ -175,10 +175,33 @@ function completeLevelWithStars(stars, xpEarned, subDetails) {
         : (Number(lvl.levelNum) + 1);
     progress.unlockedLevel = nextUn;
 
-    progress.xp += (xpEarned || 40);
+    const earnedXp = (xpEarned || 40);
+    progress.xp += earnedXp;
     saveProgress();
     if (typeof syncCloudProgress === 'function') {
         try { syncCloudProgress(false); } catch (e) {}
+    }
+
+    // Direct Cloud Firestore hook for users/{uid} collection (increment xp & score, update currentLevel & lastLoginAt)
+    try {
+        const authUid = (typeof window !== 'undefined' && window.firebase && window.firebase.auth && window.firebase.auth().currentUser && window.firebase.auth().currentUser.uid)
+            || (typeof currentUser !== 'undefined' && currentUser ? (currentUser.id || currentUser.uid) : null);
+        const db = (typeof window !== 'undefined' && window.firebase && window.firebase.firestore) ? window.firebase.firestore() : null;
+
+        if (db && authUid && (!currentUser || !currentUser.isLocalAccount || (window.firebase && window.firebase.auth && window.firebase.auth().currentUser))) {
+            db.collection('users').doc(authUid).update({
+                currentLevel: nextUn,
+                xp: window.firebase.firestore.FieldValue.increment(earnedXp),
+                score: window.firebase.firestore.FieldValue.increment(earnedXp),
+                lastLoginAt: window.firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                console.log('[Firestore] Successfully updated users/' + authUid + ' with incremented XP & score');
+            }).catch(e => {
+                console.warn('[Firestore] Notice updating users/' + authUid + ':', e);
+            });
+        }
+    } catch (fsErr) {
+        console.warn('[Firestore] Level complete hook error:', fsErr);
     }
 
     // Telemetry: Log level completion for the Admin Dashboard

@@ -178,6 +178,51 @@ async function handleFirebaseAuthStateChanged(user) {
             switchUserProgress(profile);
         }
 
+        // Firestore users/{uid} sync: Update lastLoginAt or initialize user document
+        const dbInstance = firestoreDb || (window.firebase && window.firebase.firestore ? window.firebase.firestore() : null);
+        if (dbInstance && !user.isAnonymous) {
+            try {
+                const userDocRef = dbInstance.collection('users').doc(user.uid);
+                userDocRef.get().then(snap => {
+                    if (snap.exists) {
+                        userDocRef.update({
+                            lastLoginAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                        }).catch(e => console.warn('[Firestore] lastLoginAt update notice:', e));
+
+                        const uData = snap.data();
+                        if (uData && typeof progress !== 'undefined') {
+                            const rLvl = Number(uData.currentLevel) || 1;
+                            const rXp = Number(uData.xp) || 0;
+                            if (rLvl > (progress.unlockedLevel || 1) || rXp > (progress.xp || 0)) {
+                                progress.unlockedLevel = Math.max(progress.unlockedLevel || 1, rLvl);
+                                progress.xp = Math.max(progress.xp || 0, rXp);
+                                for (let i = 1; i < progress.unlockedLevel; i++) {
+                                    if (!progress.levelStars[i]) progress.levelStars[i] = 3;
+                                }
+                                if (typeof saveProgress === 'function') saveProgress();
+                                if (typeof updateHudDisplay === 'function') updateHudDisplay();
+                                if (typeof renderWindingMap === 'function') renderWindingMap();
+                            }
+                        }
+                    } else {
+                        userDocRef.set({
+                            uid: user.uid,
+                            email: user.email || '',
+                            displayName: user.displayName || profile.name || 'Learner',
+                            role: 'user',
+                            createdAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+                            lastLoginAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+                            currentLevel: (typeof progress !== 'undefined' && progress.unlockedLevel) ? progress.unlockedLevel : 1,
+                            xp: (typeof progress !== 'undefined' && progress.xp) ? progress.xp : 0,
+                            score: (typeof progress !== 'undefined' && progress.xp) ? progress.xp : 0
+                        }).catch(e => console.warn('[Firestore] Initial user doc notice:', e));
+                    }
+                }).catch(e => console.warn('[Firestore] User doc lookup notice:', e));
+            } catch (err) {
+                console.warn('[Firestore] User document sync warning:', err);
+            }
+        }
+
         // Dismiss auth modal and welcome screen immediately on successful login
         const modal = document.getElementById('authModal');
         if (modal) modal.classList.add('hidden');
@@ -574,6 +619,49 @@ async function signInWithEmailPassword(email = null, password = null) {
         try {
             const res = await firebaseAuth.signInWithEmailAndPassword(emailInput, passInput);
             if (res && res.user) {
+                // Update lastLoginAt in Cloud Firestore users collection
+                const db = firestoreDb || (window.firebase && window.firebase.firestore ? window.firebase.firestore() : null);
+                if (db) {
+                    try {
+                        const userRef = db.collection('users').doc(res.user.uid);
+                        const snap = await userRef.get();
+                        if (snap.exists) {
+                            await userRef.update({
+                                lastLoginAt: window.firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            const uData = snap.data();
+                            if (uData && typeof progress !== 'undefined') {
+                                const remoteLvl = Number(uData.currentLevel) || 1;
+                                const remoteXp = Number(uData.xp) || 0;
+                                if (remoteLvl > (progress.unlockedLevel || 1) || remoteXp > (progress.xp || 0)) {
+                                    progress.unlockedLevel = Math.max(progress.unlockedLevel || 1, remoteLvl);
+                                    progress.xp = Math.max(progress.xp || 0, remoteXp);
+                                    for (let i = 1; i < progress.unlockedLevel; i++) {
+                                        if (!progress.levelStars[i]) progress.levelStars[i] = 3;
+                                    }
+                                    if (typeof saveProgress === 'function') saveProgress();
+                                    if (typeof updateHudDisplay === 'function') updateHudDisplay();
+                                    if (typeof renderWindingMap === 'function') renderWindingMap();
+                                }
+                            }
+                        } else {
+                            await userRef.set({
+                                uid: res.user.uid,
+                                email: emailInput,
+                                displayName: res.user.displayName || emailInput.split('@')[0],
+                                role: 'user',
+                                createdAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+                                lastLoginAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+                                currentLevel: 1,
+                                xp: 0,
+                                score: 0
+                            });
+                        }
+                    } catch (fsErr) {
+                        console.warn('[Firestore] Error syncing lastLoginAt on login:', fsErr);
+                    }
+                }
+
                 if (typeof showToast === 'function') {
                     showToast(`Welcome back, ${res.user.displayName || emailInput}!`, '✅');
                 }
@@ -678,6 +766,28 @@ async function signUpWithEmailPassword(username = null, email = null, password =
                 if (res.user.updateProfile) {
                     await res.user.updateProfile({ displayName: chosenUsername });
                 }
+
+                // Cloud Firestore Database: Create users/{uid} document with required schema
+                const db = firestoreDb || (window.firebase && window.firebase.firestore ? window.firebase.firestore() : null);
+                if (db) {
+                    try {
+                        await db.collection('users').doc(res.user.uid).set({
+                            uid: res.user.uid,
+                            email: emailInput,
+                            displayName: chosenUsername,
+                            role: 'user',
+                            createdAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+                            lastLoginAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+                            currentLevel: 1,
+                            xp: 0,
+                            score: 0
+                        });
+                        console.log('[Firestore] User document created in users/' + res.user.uid);
+                    } catch (fsErr) {
+                        console.warn('[Firestore] Error creating user doc in users collection:', fsErr);
+                    }
+                }
+
                 saveLocalAccountRecord(chosenUsername, emailInput, passInput, res.user.uid);
                 if (typeof recordAdminActivity === 'function') {
                     recordAdminActivity('signup', {
@@ -1105,6 +1215,20 @@ async function syncCloudProgress(notify = true) {
             }).catch(err => {
                 console.warn('[Cloud Progress] Firestore set note:', err);
             });
+
+            // Update users/{uid} document schema
+            if (currentUser && currentUser.id && (!currentUser.isLocalAccount || (window.firebase && window.firebase.auth && window.firebase.auth().currentUser))) {
+                const targetUid = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) ? window.firebase.auth().currentUser.uid : currentUser.id;
+                firestoreDb.collection('users').doc(targetUid).set({
+                    uid: targetUid,
+                    email: currentUser.email || '',
+                    displayName: currentUser.name || currentUser.username || 'Learner',
+                    currentLevel: currentUnlocked,
+                    xp: Number(progress.xp) || 0,
+                    score: Number(progress.xp) || 0,
+                    lastLoginAt: window.firebase && window.firebase.firestore ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
+                }, { merge: true }).catch(err => console.warn('[Cloud Progress] users collection sync note:', err));
+            }
         } catch (e) {}
     }
 

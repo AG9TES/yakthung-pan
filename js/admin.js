@@ -85,34 +85,123 @@ function autofillDefaultPasscode() {
     }
 }
 
-function handleAdminLoginSubmit(e) {
+async function handleAdminLoginSubmit(e) {
     if (e && e.preventDefault) e.preventDefault();
-    const input = document.getElementById('adminPasscodeInput');
+    const emailInput = document.getElementById('adminEmailInput');
+    const passInput = document.getElementById('adminPasscodeInput');
     const errEl = document.getElementById('adminLoginError');
-    const entered = input ? input.value.trim() : '';
+    const errText = document.getElementById('adminLoginErrorText');
+    const btnText = document.getElementById('adminLoginSubmitBtnText');
+
+    const enteredEmail = emailInput ? emailInput.value.trim().toLowerCase() : '';
+    const enteredPass = passInput ? passInput.value.trim() : '';
+
+    if (!enteredPass && !enteredEmail) {
+        if (errEl) {
+            errEl.classList.remove('hidden');
+            if (errText) errText.textContent = 'Please enter your administrator credentials.';
+        }
+        return;
+    }
 
     const validPasscode = getStoredAdminPasscode();
 
-    if (entered === validPasscode || entered === DEFAULT_ADMIN_PASSCODE) {
+    // 1. If Email & Password are provided, authenticate via Firebase Authentication & check Firestore role == 'admin'
+    if (enteredEmail && typeof window !== 'undefined' && window.firebase && window.firebase.auth) {
+        if (btnText) btnText.textContent = 'Verifying admin role...';
+        try {
+            const auth = window.firebase.auth();
+            const res = await auth.signInWithEmailAndPassword(enteredEmail, enteredPass);
+            if (res && res.user) {
+                // Check user document in Cloud Firestore
+                let isAdmin = false;
+                if (window.firebase.firestore) {
+                    try {
+                        const db = window.firebase.firestore();
+                        const userSnap = await db.collection('users').doc(res.user.uid).get();
+                        if (userSnap.exists) {
+                            const uData = userSnap.data();
+                            if (uData && uData.role === 'admin') {
+                                isAdmin = true;
+                            }
+                        }
+                    } catch (dbErr) {
+                        console.warn('[Admin Auth] Firestore role query note:', dbErr);
+                    }
+                }
+
+                // If role is admin or email is in authorized admin list
+                if (isAdmin || isAuthorizedAdminEmail(enteredEmail)) {
+                    sessionStorage.setItem(ADMIN_STORAGE_AUTH, 'true');
+                    sessionStorage.setItem('yakthung_admin_role', 'admin');
+                    sessionStorage.setItem('yakthung_admin_uid', res.user.uid);
+                    sessionStorage.setItem('yakthung_admin_email', enteredEmail);
+                    if (errEl) errEl.classList.add('hidden');
+                    if (btnText) btnText.textContent = 'Unlock Enterprise Console';
+                    if (emailInput) emailInput.value = '';
+                    if (passInput) passInput.value = '';
+                    renderAdminDashboard();
+                    showAdminToast(`Welcome, Administrator (${res.user.displayName || enteredEmail})!`, '🛡️');
+                    return;
+                } else {
+                    // Block access and sign out regular user
+                    await auth.signOut();
+                    if (btnText) btnText.textContent = 'Unlock Enterprise Console';
+                    if (errEl) {
+                        errEl.classList.remove('hidden');
+                        if (errText) errText.textContent = "Access Denied: Your account does not have administrator privileges (role must be 'admin' in Firestore).";
+                    }
+                    return;
+                }
+            }
+        } catch (authErr) {
+            console.warn('[Admin Auth] Firebase sign-in warning:', authErr);
+            if (btnText) btnText.textContent = 'Unlock Enterprise Console';
+            // Check if enteredPass matches emergency passcode fallback
+            if (enteredPass === validPasscode || enteredPass === DEFAULT_ADMIN_PASSCODE) {
+                sessionStorage.setItem(ADMIN_STORAGE_AUTH, 'true');
+                if (errEl) errEl.classList.add('hidden');
+                if (passInput) passInput.value = '';
+                renderAdminDashboard();
+                showAdminToast('Console unlocked with master passcode', '🛡️');
+                return;
+            }
+            if (errEl) {
+                errEl.classList.remove('hidden');
+                if (errText) errText.textContent = authErr.message || 'Invalid administrator email or password.';
+            }
+            return;
+        }
+    }
+
+    // 2. Passcode-only fallback authentication
+    if (enteredPass === validPasscode || enteredPass === DEFAULT_ADMIN_PASSCODE) {
         sessionStorage.setItem(ADMIN_STORAGE_AUTH, 'true');
         if (errEl) errEl.classList.add('hidden');
-        if (input) input.value = '';
+        if (passInput) passInput.value = '';
         renderAdminDashboard();
         showAdminToast('Welcome, Administrator!', '🛡️');
     } else {
         if (errEl) {
             errEl.classList.remove('hidden');
+            if (errText) errText.textContent = 'Invalid administrator credentials. Please try again.';
         }
-        if (input) {
-            input.classList.add('ring-2', 'ring-rose-500');
-            setTimeout(() => input.classList.remove('ring-2', 'ring-rose-500'), 1500);
-            input.focus();
+        if (passInput) {
+            passInput.classList.add('ring-2', 'ring-rose-500');
+            setTimeout(() => passInput.classList.remove('ring-2', 'ring-rose-500'), 1500);
+            passInput.focus();
         }
     }
 }
 
 function logoutAdmin() {
     sessionStorage.removeItem(ADMIN_STORAGE_AUTH);
+    sessionStorage.removeItem('yakthung_admin_role');
+    sessionStorage.removeItem('yakthung_admin_uid');
+    sessionStorage.removeItem('yakthung_admin_email');
+    if (typeof window !== 'undefined' && window.firebase && window.firebase.auth) {
+        try { window.firebase.auth().signOut(); } catch (e) {}
+    }
     teardownRealtimeListeners();
     renderAdminDashboard();
     showAdminToast('Admin session locked', '🔒');
@@ -388,16 +477,34 @@ function setupFirestoreRealtime() {
         usersUnsubscribe = db.collection('users').onSnapshot((snapshot) => {
             snapshot.docChanges().forEach(change => {
                 const data = change.doc.data();
+                const parseDateIso = (d) => {
+                    if (!d) return null;
+                    if (d.toDate && typeof d.toDate === 'function') return d.toDate().toISOString();
+                    return String(d);
+                };
+
+                const lastLoginIso = parseDateIso(data.lastLoginAt) || parseDateIso(data.lastLogin) || parseDateIso(data.updatedAt) || new Date().toISOString();
+                const createdIso = parseDateIso(data.createdAt) || lastLoginIso;
+
+                const userCurrentLevel = Number(data.currentLevel !== undefined ? data.currentLevel : (data.lastLevel || data.level || 1)) || 1;
+                const userXp = Number(data.xp !== undefined ? data.xp : (data.lastXp || 0)) || 0;
+                const userScore = Number(data.score !== undefined ? data.score : userXp) || 0;
+
                 const updatedUser = {
                     userId: change.doc.id,
-                    userName: data.name || data.username || 'Learner',
+                    uid: data.uid || change.doc.id,
+                    userName: data.displayName || data.name || data.username || (data.email ? data.email.split('@')[0] : 'Learner'),
                     email: data.email || '',
-                    provider: data.provider || 'cloud',
-                    lastActive: data.lastLogin ? (data.lastLogin.toDate ? data.lastLogin.toDate().toISOString() : data.lastLogin) : new Date().toISOString(),
-                    lastAction: 'login',
-                    level: data.lastLevel || 1,
-                    xp: data.lastXp || 0,
-                    device: data.lastDevice || 'Mobile App'
+                    role: data.role || 'user',
+                    provider: data.provider || (data.email ? 'email' : 'cloud'),
+                    lastLoginAt: lastLoginIso,
+                    lastActive: lastLoginIso,
+                    createdAt: createdIso,
+                    currentLevel: userCurrentLevel,
+                    level: userCurrentLevel,
+                    xp: userXp,
+                    score: userScore,
+                    device: data.lastDevice || 'Learner App'
                 };
 
                 updateLearnerInRoster(updatedUser);
@@ -968,14 +1075,20 @@ function updateKPICards() {
 
     // 1. Online Right Now (presence within 15 mins)
     const onlineNowCount = cachedLearners.filter(u => {
-        const t = new Date(u.lastActive || 0).getTime();
+        const t = new Date(u.lastLoginAt || u.lastActive || 0).getTime();
         return (now - t) < fifteenMinsMs;
     }).length;
 
-    // 2. Active Today (DAU within 24h)
-    const activeTodayCount = cachedLearners.filter(u => {
-        const t = new Date(u.lastActive || 0).getTime();
-        return (now - t) < oneDayMs;
+    // 2. Active users filtering lastLoginAt for last 24 hours (DAU) & last 7 days (WAU)
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const active24hCount = cachedLearners.filter(u => {
+        const t = new Date(u.lastLoginAt || u.lastActive || 0).getTime();
+        return (now - t) <= oneDayMs;
+    }).length;
+
+    const active7dCount = cachedLearners.filter(u => {
+        const t = new Date(u.lastLoginAt || u.lastActive || 0).getTime();
+        return (now - t) <= sevenDaysMs;
     }).length;
 
     // 3. Daily Logins (Today) vs Total Logins
@@ -987,19 +1100,24 @@ function updateKPICards() {
 
     const totalLoginsCount = cachedLogs.filter(l => l.action === 'login' || l.action === 'signup' || l.action === 'app_launch').length;
 
-    // 4. New Registrations Today
-    const todaySignups = cachedLogs.filter(l => {
+    // 4. New Registrations Today (from users createdAt or signup logs)
+    const todaySignups = cachedLearners.filter(u => {
+        const t = new Date(u.createdAt || 0).getTime();
+        return t >= startOfTodayMs;
+    }).length || cachedLogs.filter(l => {
         const isSignup = l.action === 'signup';
         const t = new Date(l.timestamp || 0).getTime();
         return isSignup && t >= startOfTodayMs;
     }).length;
 
-    // 5. XP and Mountain Progress
+    // 5. XP, Score and Mountain Progress
     let sumXp = 0;
+    let sumScore = 0;
     let sumLevel = 0;
     cachedLearners.forEach(u => {
         sumXp += Number(u.xp) || 0;
-        sumLevel += Number(u.level) || 1;
+        sumScore += Number(u.score !== undefined ? u.score : (u.xp || 0)) || 0;
+        sumLevel += Number(u.currentLevel || u.level) || 1;
     });
 
     const avgLevel = (sumLevel / totalLearners).toFixed(1);
@@ -1009,7 +1127,7 @@ function updateKPICards() {
     if (onlineNowEl) onlineNowEl.textContent = `${onlineNowCount} Online`;
     if (dailyLoginsEl) dailyLoginsEl.textContent = `${todayLogins} Logins`;
     if (totalLoginsEl) totalLoginsEl.textContent = totalLoginsCount.toLocaleString();
-    if (activeTodayEl) activeTodayEl.textContent = Math.max(activeTodayCount, 1).toLocaleString();
+    if (activeTodayEl) activeTodayEl.textContent = Math.max(active24hCount, 1).toLocaleString();
     if (totalXpEl) totalXpEl.textContent = sumXp.toLocaleString() + ' XP';
     if (avgLevelEl) avgLevelEl.textContent = 'Level ' + avgLevel;
 }
@@ -1185,15 +1303,21 @@ function renderLearnersTable() {
         const timeAgo = formatTimeAgo(user.lastActive);
         const providerBadge = getProviderBadge(user.provider);
         const userAvatar = getUserAvatarHtml(user.userName, user.email);
-        const currentLevel = Number(user.level) || 1;
+        const currentLevel = Number(user.currentLevel !== undefined ? user.currentLevel : (user.level || 1)) || 1;
         const levelPct = Math.min(100, Math.round((currentLevel / 21) * 100));
+        const userXp = Number(user.xp !== undefined ? user.xp : (user.lastXp || 0)) || 0;
+        const userScore = Number(user.score !== undefined ? user.score : userXp) || 0;
+        const roleBadge = user.role === 'admin'
+            ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 font-bold text-[10px]">🛡️ Admin</span>`
+            : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-500/10 border border-slate-500/20 text-slate-400 font-medium text-[10px]">Learner</span>`;
 
         const now = Date.now();
-        const lastActiveMs = new Date(user.lastActive || 0).getTime();
+        const lastLoginTime = user.lastLoginAt || user.lastActive;
+        const lastActiveMs = new Date(lastLoginTime || 0).getTime();
         const isOnline = (now - lastActiveMs) < (15 * 60 * 1000);
         const onlineIndicator = isOnline
             ? `<div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-black text-[10px] animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Online Now</div>`
-            : `<div class="font-bold text-slate-300 text-xs live-time-ago" data-timestamp="${user.lastActive}">${timeAgo}</div>`;
+            : `<div class="font-bold text-slate-300 text-xs live-time-ago" data-timestamp="${lastLoginTime}">${timeAgo}</div>`;
 
         return `
             <tr class="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors text-xs">
@@ -1206,7 +1330,12 @@ function renderLearnersTable() {
                         </div>
                     </div>
                 </td>
-                <td class="py-3.5 px-4">${providerBadge}</td>
+                <td class="py-3.5 px-4">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        ${providerBadge}
+                        ${roleBadge}
+                    </div>
+                </td>
                 <td class="py-3.5 px-4">
                     <div class="space-y-1.5 min-w-[140px]">
                         <div class="flex items-center justify-between font-bold text-[11px]">
@@ -1219,14 +1348,20 @@ function renderLearnersTable() {
                     </div>
                 </td>
                 <td class="py-3.5 px-4">
-                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                        <span class="font-black text-emerald-400 text-xs font-mono">${(Number(user.xp) || 0).toLocaleString()}</span>
-                        <span class="text-[9px] text-emerald-300 font-bold">XP</span>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                            <span class="font-black text-emerald-400 text-xs font-mono">${userXp.toLocaleString()}</span>
+                            <span class="text-[9px] text-emerald-300 font-bold">XP</span>
+                        </div>
+                        <div class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20">
+                            <span class="font-bold text-teal-300 text-[11px] font-mono">${userScore.toLocaleString()}</span>
+                            <span class="text-[8px] text-teal-400 font-bold uppercase">Score</span>
+                        </div>
                     </div>
                 </td>
                 <td class="py-3.5 px-4 text-slate-300">
                     ${onlineIndicator}
-                    <div class="text-[10px] text-slate-500 mt-0.5">${escapeHtml(user.device || 'Learner App')}</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5 font-mono">${lastLoginTime ? new Date(lastLoginTime).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (user.device || 'Learner App')}</div>
                 </td>
                 <td class="py-3.5 px-4 text-right">
                     <button onclick="inspectLearnerDetail('${escapeAttr(user.userId || user.email)}')" class="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-emerald-500 hover:text-[#080c14] text-slate-300 border border-white/10 font-bold text-[11px] transition active:scale-95 cursor-pointer">
@@ -1346,21 +1481,21 @@ function inspectLearnerDetail(key) {
             </div>
 
             <div class="p-3 rounded-2xl bg-[#080c14] border border-white/10">
-                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Total XP Earned</div>
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Total XP & Score</div>
                 <div class="text-xl font-black text-purple-300 mt-0.5">${(Number(user.xp) || 0).toLocaleString()} <span class="text-xs text-slate-500">XP</span></div>
-                <div class="text-[10px] text-emerald-400 font-semibold mt-1">🏆 Trail Mastery</div>
+                <div class="text-[10px] text-teal-400 font-semibold mt-1">Score: ${(Number(user.score !== undefined ? user.score : user.xp) || 0).toLocaleString()} Pts</div>
             </div>
 
             <div class="p-3 rounded-2xl bg-[#080c14] border border-white/10">
-                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Platform / Device</div>
-                <div class="text-sm font-bold text-slate-200 mt-1 truncate">${escapeHtml(user.device || 'Android APK')}</div>
-                <div class="text-[10px] text-slate-500 mt-1">Client Hardware</div>
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Account Role</div>
+                <div class="text-sm font-bold ${user.role === 'admin' ? 'text-rose-400' : 'text-slate-200'} mt-1 truncate">${user.role === 'admin' ? '🛡️ Administrator' : '👤 Regular User'}</div>
+                <div class="text-[10px] text-slate-500 mt-1 font-mono">${escapeHtml(user.provider || 'email')} auth</div>
             </div>
 
             <div class="p-3 rounded-2xl bg-[#080c14] border border-white/10">
-                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Last Recorded Action</div>
-                <div class="text-sm font-mono font-bold text-emerald-400 mt-1 truncate">${escapeHtml(user.lastAction || 'login')}</div>
-                <div class="text-[10px] text-slate-500 mt-1">Live Telemetry</div>
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Last Login At</div>
+                <div class="text-xs font-mono font-bold text-emerald-400 mt-1 truncate">${user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}</div>
+                <div class="text-[10px] text-slate-500 mt-1">${user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : formatTimeAgo(user.lastActive)}</div>
             </div>
         </div>
 

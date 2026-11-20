@@ -50,20 +50,27 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
+    <!-- ========================================================================= -->
+    <!-- FIREBASE CONFIGURATION                                                    -->
+    <!-- If connecting to your own Firebase project, PASTE YOUR FIREBASE CONFIG    -->
+    <!-- OBJECT IN THE 'firebaseConfig' VARIABLE BELOW:                            -->
+    <!-- ========================================================================= -->
     <script>
+        // PASTE YOUR FIREBASE CONFIG HERE:
+        var firebaseConfig = {
+            apiKey: "AIzaSyCTtRZBe_CGc0k0xZzQ8KDzJEAFoN9Huo8",
+            authDomain: "yakthung-pan.firebaseapp.com",
+            projectId: "yakthung-pan",
+            storageBucket: "yakthung-pan.firebasestorage.app",
+            messagingSenderId: "923150025349",
+            appId: "1:923150025349:web:5d46d111c3f8b1ca5edfec"
+        };
+
         // Initialize Firebase for Admin Dashboard
         (function() {
-            var config = {
-                apiKey: "AIzaSyCTtRZBe_CGc0k0xZzQ8KDzJEAFoN9Huo8",
-                authDomain: "yakthung-pan.firebaseapp.com",
-                projectId: "yakthung-pan",
-                storageBucket: "yakthung-pan.firebasestorage.app",
-                messagingSenderId: "923150025349",
-                appId: "1:923150025349:web:5d46d111c3f8b1ca5edfec"
-            };
             try {
                 if (window.firebase && !window.firebase.apps.length) {
-                    window.firebase.initializeApp(config);
+                    window.firebase.initializeApp(firebaseConfig);
                 }
             } catch (e) {
                 console.warn('[Admin Firebase] Init note:', e);
@@ -172,13 +179,21 @@
                 <p class="text-xs text-slate-400 font-medium">Restricted enterprise telemetry & user session audit</p>
             </div>
 
-            <!-- Passcode Form -->
+            <!-- Passcode / Email Form -->
             <form onsubmit="handleAdminLoginSubmit(event)" class="space-y-4 text-left">
+                <label class="block space-y-1.5">
+                    <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Administrator Email (Optional if using passcode)</span>
+                    <span class="relative flex items-center bg-[#080c14] border border-white/10 rounded-2xl focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200 overflow-hidden shadow-inner">
+                        <span class="pl-3.5 text-sm text-slate-500 select-none">✉️</span>
+                        <input id="adminEmailInput" type="email" placeholder="admin@yakthung.com" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-sm font-medium focus:outline-none">
+                    </span>
+                </label>
+
                 <div class="space-y-1.5">
-                    <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Administrator Passcode</label>
+                    <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Administrator Password / Passcode</label>
                     <div class="relative flex items-center bg-[#080c14] border border-white/10 rounded-2xl focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200 overflow-hidden shadow-inner">
                         <span class="pl-3.5 text-sm text-slate-500 select-none">🔒</span>
-                        <input id="adminPasscodeInput" type="password" placeholder="Enter administrator passcode" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-sm font-medium focus:outline-none font-mono">
+                        <input id="adminPasscodeInput" type="password" placeholder="Enter administrator password or passcode" class="w-full bg-transparent px-3 py-3 text-white placeholder-slate-500 text-sm font-medium focus:outline-none font-mono">
                         <button type="button" onclick="const el=document.getElementById('adminPasscodeInput'); el.type = el.type==='password'?'text':'password';" class="pr-3.5 pl-2 text-sm text-slate-500 hover:text-slate-300 transition" title="Show/Hide Passcode">👁️</button>
                     </div>
                     
@@ -195,12 +210,12 @@
                 <!-- Error Notice -->
                 <div id="adminLoginError" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
                     <span>⚠️</span>
-                    <span id="adminLoginErrorText">Invalid administrator passcode. Please try again.</span>
+                    <span id="adminLoginErrorText">Invalid administrator credentials. Please try again.</span>
                 </div>
 
                 <!-- Submit Button -->
-                <button type="submit" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 btn-shimmer hover:opacity-95 active:scale-[0.98] text-[#080c14] font-black text-sm tracking-wide shadow-[0_10px_25px_rgba(16,185,129,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2">
-                    <span>Unlock Enterprise Console</span>
+                <button type="submit" id="adminLoginSubmitBtn" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 btn-shimmer hover:opacity-95 active:scale-[0.98] text-[#080c14] font-black text-sm tracking-wide shadow-[0_10px_25px_rgba(16,185,129,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2">
+                    <span id="adminLoginSubmitBtnText">Unlock Enterprise Console</span>
                     <span class="text-base">→</span>
                 </button>
             </form>
